@@ -1,28 +1,33 @@
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
+import Countdown from '@/components/Countdown'
+import Image from 'next/image'
 
 export default async function LandingPage() {
   const supabase = await createClient()
-  
-  // Verifica silenciosamente se existe uma sessão ativa
   const { data: { user } } = await supabase.auth.getUser()
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#0a0a0a] text-white font-sans overflow-hidden selection:bg-teal-500 selection:text-white">
       
-      {/* Navbar Básica */}
-      <nav className="w-full bg-white border-b border-gray-200 p-4">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <div className="text-xl font-black text-green-600 tracking-tight">
-            Bolão2026 🏆
+      {/* Luz de Fundo (Glow Effect) */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[600px] bg-gradient-to-b from-teal-900/40 via-emerald-900/10 to-transparent blur-3xl pointer-events-none -z-10"></div>
+
+      {/* Navbar Transparente */}
+      <nav className="relative z-10 w-full border-b border-white/10 bg-black/50 backdrop-blur-lg">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-black tracking-wider text-white uppercase">
+              Bolão <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">World Cup 2026</span>
+            </span>
           </div>
           <div>
             {user ? (
-              <Link href="/dashboard" className="text-sm font-semibold text-blue-600 hover:text-blue-800">
+              <Link href="/dashboard" className="px-6 py-2 text-sm font-bold bg-white/10 hover:bg-white/20 border border-white/5 rounded-full transition-all">
                 Meu Painel →
               </Link>
             ) : (
-              <Link href="/login" className="text-sm font-semibold text-gray-600 hover:text-gray-900">
+              <Link href="/login" className="px-6 py-2 text-sm font-bold text-gray-300 hover:text-white transition-colors">
                 Entrar
               </Link>
             )}
@@ -30,84 +35,311 @@ export default async function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section (Apresentação Principal) */}
-      <main className="flex-1 flex flex-col items-center justify-center text-center px-4 py-16 sm:py-24">
-        <h1 className="text-4xl sm:text-6xl font-black text-gray-900 tracking-tight mb-6 max-w-3xl">
-          Mostre que você entende de futebol e <span className="text-green-600">domine o ranking.</span>
+      {/* Seção Principal (Hero) */}
+      <main className="relative z-10 flex flex-col items-center justify-center px-4 pt-16 pb-24 text-center">
+        
+        {/* Emblema da Marca Estilizado */}
+        <div className="relative flex flex-col items-center justify-center mb-8 px-8 py-4 bg-white/[0.02] border border-white/5 rounded-3xl backdrop-blur-md">
+          <div className="absolute inset-0 bg-gradient-to-tr from-teal-500 to-emerald-400 rounded-3xl blur-2xl opacity-20 -z-10"></div>
+          
+          <span className="text-xs font-black tracking-[0.5em] text-teal-400 uppercase mb-1">
+            Plataforma Oficial
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase">
+            Bolão <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-emerald-400">World Cup</span>
+          </h2>
+          <span className="text-6xl sm:text-7xl font-black leading-none text-white tracking-tighter">
+            2026
+          </span>
+          
+          <div className="absolute -bottom-10 -right-6 drop-shadow-2xl hover:scale-110 transition-transform cursor-pointer">
+            <Image 
+              src="/trophy.png" 
+              alt="Logo Copa do Mundo 2026" 
+              width={120} 
+              height={120} 
+              className="object-contain"
+            />
+          </div> 
+        </div>
+
+        <h1 className="text-5xl sm:text-7xl md:text-8xl font-black tracking-tighter mb-6 max-w-5xl leading-tight">
+          A COPA CHEGOU.<br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-200">
+            CRIE SEU PALPITE.
+          </span>
         </h1>
         
-        <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-2xl">
-          Participe do bolão mais completo da Copa do Mundo 2026. Dê seus palpites para a fase de grupos, escolha os campeões e acerte os placares de cada partida.
+        <p className="text-lg sm:text-xl text-gray-400 mb-12 max-w-2xl">
+          Faltam poucos dias para a bola rolar! Junte-se ao <span className="text-white font-semibold">Bolão World Cup 2026</span>, monte sua estratégia para a fase de grupos, escolha o artilheiro e suba no ranking.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+        {/* Cronômetro */}
+        <div className="mb-14 w-full">
+          <p className="text-sm font-bold uppercase tracking-[0.2em] mb-6 text-gray-400">
+            Abertura da Copa: México <span className="text-white">vs</span> África do Sul
+          </p>
+          <Countdown />
+        </div>
+
+        {/* Botões de Ação */}
+        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto px-4">
           {user ? (
              <Link 
               href="/dashboard" 
-              className="px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full text-lg transition-transform hover:scale-105 shadow-lg"
+              className="px-10 py-4 bg-teal-500 hover:bg-teal-400 text-black font-black rounded-full text-lg transition-all hover:scale-105 shadow-[0_0_40px_-10px_rgba(20,184,166,0.6)]"
             >
-              Acessar Meu Painel
+              Acessar Meus Palpites
             </Link>
           ) : (
             <>
               <Link 
                 href="/cadastro" 
-                className="px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full text-lg transition-transform hover:scale-105 shadow-lg"
+                className="px-10 py-4 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-black font-black rounded-full text-lg transition-all hover:scale-105 shadow-[0_0_40px_-10px_rgba(20,184,166,0.5)]"
               >
-                Participar Agora
+                Participar do Bolão
               </Link>
               <Link 
                 href="/login" 
-                className="px-8 py-4 bg-white border-2 border-gray-200 hover:border-gray-300 text-gray-800 font-bold rounded-full text-lg transition-colors"
+                className="px-10 py-4 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold rounded-full text-lg transition-colors"
               >
-                Já tenho uma conta
+                Já tenho conta
               </Link>
             </>
           )}
         </div>
       </main>
 
-      {/* Seção de Funcionalidades (Explicando as regras) */}
-      <section className="bg-white py-16 px-4 border-t border-gray-100">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-12">
-            Como funciona a pontuação?
+      {/* Seção de Regras e Recursos */}
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-white/5">
+        <div className="grid md:grid-cols-3 gap-6">
+            <div className="bg-white/5 border border-white/5 p-8 rounded-3xl backdrop-blur-sm hover:bg-white/10 transition-colors">
+              <div className="text-5xl mb-6">🔮</div>
+              <h3 className="text-2xl font-bold text-white mb-3">Previsões Completas</h3>
+              <p className="text-gray-400 leading-relaxed">
+                Defina o grande campeão, o vice, o artilheiro do torneio e a classificação exata dos grupos antes da cerimônia de abertura.
+              </p>
+            </div>
+            <div className="bg-white/5 border border-white/5 p-8 rounded-3xl backdrop-blur-sm hover:bg-white/10 transition-colors">
+              <div className="text-5xl mb-6">⚡</div>
+              <h3 className="text-2xl font-bold text-white mb-3">Placares Recorrentes</h3>
+              <p className="text-gray-400 leading-relaxed">
+                Altere os placares dos jogos individuais até 1 minuto antes do apito inicial. A flexibilidade que você precisa para pontuar rodada a rodada.
+              </p>
+            </div>
+            <div className="bg-white/5 border border-white/5 p-8 rounded-3xl backdrop-blur-sm hover:bg-white/10 transition-colors">
+              <div className="text-5xl mb-6">🏆</div>
+              <h3 className="text-2xl font-bold text-white mb-3">Ranking em Tempo Real</h3>
+              <p className="text-gray-400 leading-relaxed">
+                Acompanhe sua posição na tabela geral imediatamente após o término das partidas. Sistema de pontuação automatizado e seguro.
+              </p>
+            </div>
+        </div>
+      </div>
+      {/* Seção de Pontuação Simplificada */}
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-20">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight uppercase mb-4">
+            Como <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">Pontuar</span>
           </h2>
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+            Regras simples para você focar no que importa: acertar os resultados e dominar o ranking.
+          </p>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-8">
           
-          <div className="grid sm:grid-cols-3 gap-8">
-            {/* Card 1 */}
-            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-              <div className="text-4xl mb-4">🔮</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Palpites Pré-Copa</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Antes de a bola rolar para o primeiro jogo, defina quem será o Campeão, Vice, Artilheiro e as posições de cada grupo. Acertou? Ganhou pontos extras valiosos!
-              </p>
-            </div>
-
-            {/* Card 2 */}
-            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-              <div className="text-4xl mb-4">⚽</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Jogo a Jogo</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Deixe seus palpites para os placares exatos de cada partida. Você tem até 1 minuto antes do apito inicial para alterar sua aposta e garantir os pontos da rodada.
-              </p>
-            </div>
-
-            {/* Card 3 */}
-            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-              <div className="text-4xl mb-4">📈</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Ranking em Tempo Real</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Assim que as partidas acabam, o sistema calcula tudo automaticamente. Acompanhe a tabela de classificação e veja quem está na liderança do grupo.
-              </p>
+          {/* Card 1: Por Partida */}
+          <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-8 relative overflow-hidden group hover:border-teal-500/30 transition-colors duration-300">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/10 blur-3xl rounded-full group-hover:bg-teal-500/20 transition-all"></div>
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <span className="text-3xl">🎯</span> Nos Jogos
+            </h3>
+            <ul className="space-y-4 text-gray-400">
+              <li className="flex justify-between items-center border-b border-white/5 pb-3">
+                <span>Placar exato (Na mosca!)</span>
+                <span className="font-black text-teal-400 text-xl">10 pts</span>
+              </li>
+              <li className="flex justify-between items-center border-b border-white/5 pb-3">
+                <span>Acertar o vencedor (ou empate)</span>
+                <span className="font-black text-emerald-400 text-xl">5 pts</span>
+              </li>
+              <li className="flex justify-between items-center border-b border-white/5 pb-3">
+                <span>Acertar os gols de um dos times</span>
+                <span className="font-black text-emerald-400/70 text-lg">+2 pts</span>
+              </li>
+            </ul>
+            <div className="mt-6 p-3 rounded-xl bg-white/1 border border-white/10 text-xs text-gray-400 flex items-start gap-2">
+              <p className="font-bold">Válido apenas para os 90 minutos (não conta prorrogação ou pênaltis).</p>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Footer Simples */}
-      <footer className="bg-gray-900 text-gray-400 py-8 text-center text-sm">
-        <p>Desenvolvido para a Copa do Mundo de 2026 🌎</p>
+          {/* Card 2: Fases e Bônus */}
+          <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-8 relative overflow-hidden group hover:border-emerald-500/30 transition-colors duration-300">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl rounded-full group-hover:bg-emerald-500/20 transition-all"></div>
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <span className="text-3xl">🔥</span> Classificação
+            </h3>
+            <ul className="space-y-4 text-gray-400">
+              <li className="flex justify-between items-center border-b border-white/5 pb-3">
+                <span>Posição exata nos Grupos</span>
+                <span className="font-black text-teal-400 text-xl">3 pts</span>
+              </li>
+              <li className="flex flex-col border-b border-white/5 pb-3">
+                <div className="flex justify-between items-center mb-1">
+                  <span>Passar na 2ª Fase / Oitavas</span>
+                  <span className="font-black text-emerald-400 text-xl">1 a 2 pts</span>
+                </div>
+                <span className="text-xs font-semibold text-teal-300 tracking-wide uppercase">Bônus de +40 pts se gabaritar a fase!</span>
+              </li>
+              <li className="flex flex-col border-b border-white/5 pb-3">
+                <div className="flex justify-between items-center mb-1">
+                  <span>Quartas e Semifinais</span>
+                  <span className="font-black text-emerald-400 text-xl">5 a 10 pts</span>
+                </div>
+                <span className="text-xs font-semibold text-teal-300 tracking-wide uppercase">Bônus de +50 pts se gabaritar a fase!</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Card 3: A Glória */}
+          <div className="bg-gradient-to-br from-teal-900/30 to-emerald-900/10 border border-teal-500/40 rounded-3xl p-8 relative overflow-hidden shadow-[0_0_30px_-10px_rgba(20,184,166,0.2)]">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-teal-400/20 blur-3xl rounded-full"></div>
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <span className="text-3xl">👑</span> Premiação Final
+            </h3>
+            <ul className="space-y-5 text-gray-300">
+              <li className="flex justify-between items-center border-b border-white/10 pb-3">
+                <span className="font-medium text-lg">Campeão do Mundo</span>
+                <span className="font-black text-teal-300 text-3xl drop-shadow-md">40 pts</span>
+              </li>
+              <li className="flex justify-between items-center border-b border-white/10 pb-3">
+                <span className="font-medium text-lg">Artilheiro da Copa</span>
+                <span className="font-black text-emerald-300 text-2xl drop-shadow-md">35 pts</span>
+              </li>
+              <li className="flex justify-between items-center pb-1">
+                <span className="font-medium text-lg">Vice-campeão</span>
+                <span className="font-black text-teal-400/80 text-xl">30 pts</span>
+              </li>
+            </ul>
+            <div className="mt-8 pt-4 border-t border-teal-500/30 text-center">
+              <span className="text-sm text-teal-200 font-medium">Faça a sua aposta antes do 1º jogo!</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Seção de Premiação (O Pote de Ouro) */}
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-white/5">
+        <div className="text-center mb-16 relative">
+          {/* Brilho dourado no fundo do título */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-32 bg-amber-500/20 blur-[100px] pointer-events-none"></div>
+          
+          <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight uppercase mb-4 relative z-10">
+            A <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-orange-500">Premiação</span>
+          </h2>
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto relative z-10">
+            Sem letras miúdas. Veja exatamente como o valor arrecadado é distribuído entre os melhores da competição.
+          </p>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-8">
+          
+          {/* Card 1: A Arrecadação */}
+          <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-8 relative overflow-hidden group hover:border-amber-500/30 transition-colors duration-300">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-3xl rounded-full group-hover:bg-amber-500/20 transition-all"></div>
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <span className="text-3xl">🎟️</span> A Entrada
+            </h3>
+            
+            <div className="flex flex-col items-center justify-center p-6 bg-amber-500/10 border border-amber-500/20 rounded-2xl mb-6">
+              <span className="text-sm font-bold text-amber-200 uppercase tracking-widest mb-1">Valor por Bolão</span>
+              <span className="text-4xl font-black text-amber-400 drop-shadow-md">R$ 30,00</span>
+            </div>
+
+            <ul className="space-y-4 text-gray-400">
+              <li className="flex justify-between items-center border-b border-white/5 pb-3">
+                <span>Para o Prêmio Final</span>
+                <span className="font-bold text-amber-400">65%</span>
+              </li>
+              <li className="flex justify-between items-center pb-1">
+                <span>Custos de Organização</span>
+                <span className="font-bold text-gray-500">35%</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Card 2: O Pódio */}
+          <div className="bg-gradient-to-br from-amber-900/20 to-orange-900/10 border border-amber-500/40 rounded-3xl p-8 relative overflow-hidden shadow-[0_0_30px_-10px_rgba(245,158,11,0.15)] group hover:shadow-[0_0_40px_-10px_rgba(245,158,11,0.3)] transition-all duration-300 transform hover:-translate-y-1">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/20 blur-3xl rounded-full"></div>
+            <h3 className="text-2xl font-bold text-white mb-8 flex items-center gap-3">
+              <span className="text-3xl">🏆</span> O Pódio
+            </h3>
+            
+            <ul className="space-y-6 text-gray-300 relative z-10">
+              <li className="flex justify-between items-center border-b border-amber-500/20 pb-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🥇</span>
+                  <span className="font-bold text-xl">1º Lugar</span>
+                </div>
+                <span className="font-black text-amber-400 text-4xl drop-shadow-[0_2px_10px_rgba(245,158,11,0.5)]">50%</span>
+              </li>
+              <li className="flex justify-between items-center border-b border-amber-500/10 pb-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🥈</span>
+                  <span className="font-bold text-lg text-gray-200">2º Lugar</span>
+                </div>
+                <span className="font-black text-gray-300 text-2xl">30%</span>
+              </li>
+              <li className="flex justify-between items-center pb-2">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🥉</span>
+                  <span className="font-bold text-lg text-orange-200/80">3º Lugar</span>
+                </div>
+                <span className="font-black text-orange-300/80 text-xl">20%</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Card 3: Regras de Empate */}
+          <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-8 relative overflow-hidden group hover:border-orange-500/30 transition-colors duration-300">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full group-hover:bg-orange-500/20 transition-all"></div>
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <span className="text-3xl">⚖️</span> Em caso de Empate
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                <h4 className="text-sm font-bold text-amber-300 uppercase tracking-wide mb-1">Empate no 1º Lugar</h4>
+                <p className="text-gray-400 text-sm leading-relaxed">
+                  <strong className="text-gray-200">2 pessoas:</strong> Dividem <span className="text-amber-400 font-bold">80%</span> (1º + 2º prêmio). O 3º colocado leva os 20% normais.<br/>
+                  <strong className="text-gray-200 mt-1 block">3+ pessoas:</strong> Dividem <span className="text-amber-400 font-bold">100%</span> do prêmio igualmente.
+                </p>
+              </div>
+
+              <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                <h4 className="text-sm font-bold text-gray-300 uppercase tracking-wide mb-1">Empate no 2º Lugar</h4>
+                <p className="text-gray-400 text-sm leading-relaxed">
+                  Dividem <span className="text-gray-200 font-bold">50%</span> (2º + 3º prêmio). O campeão fica intacto com seus 50%.
+                </p>
+              </div>
+
+              <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                <h4 className="text-sm font-bold text-orange-200/80 uppercase tracking-wide mb-1">Empate no 3º Lugar</h4>
+                <p className="text-gray-400 text-sm leading-relaxed">
+                  Dividem igualmente a fatia de <span className="text-orange-300 font-bold">20%</span>.
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="bg-black/80 text-gray-500 py-8 text-center text-sm border-t border-white/5">
+        <p>Plataforma independente de entretenimento • Bolão World Cup 2026 🌎</p>
       </footer>
     </div>
   )
