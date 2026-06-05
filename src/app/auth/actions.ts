@@ -16,7 +16,7 @@ export async function login(formData: FormData) {
   })
 
   if (error) {
-    return redirect('/login?error=Falha no login')
+    return redirect(`/login?error=${encodeURIComponent('Email ou senha inválidos.')}`)
   }
 
   revalidatePath('/', 'layout')
