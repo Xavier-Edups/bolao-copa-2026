@@ -33,7 +33,7 @@ export default async function LoginPage({
           <p className="text-gray-400 text-sm">Acesse seu painel para gerenciar seus palpites</p>
         </div>
         
-        <form className="flex flex-col gap-6">
+        <form action={login} noValidate className="flex flex-col gap-6">
           
           {/* Campo de E-mail */}
           <div>
@@ -75,7 +75,7 @@ export default async function LoginPage({
           {/* Botões */}
           <div className="mt-4">
             <button
-              formAction={login}
+              type="submit"
               className="w-full py-4 px-4 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-black font-black uppercase tracking-wide rounded-xl transition-all shadow-[0_0_20px_-5px_rgba(20,184,166,0.4)] hover:shadow-[0_0_30px_-5px_rgba(20,184,166,0.6)] transform hover:-translate-y-0.5"
             >
               Entrar no Jogo

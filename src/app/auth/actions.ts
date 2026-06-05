@@ -10,6 +10,11 @@ export async function login(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!email || !emailRegex.test(email)) {
+    return redirect(`/login?error=${encodeURIComponent('Por favor, insira um e-mail válido.')}`)
+  }
+
   const { error } = await supabase.auth.signInWithPassword({
     email,
     password,
