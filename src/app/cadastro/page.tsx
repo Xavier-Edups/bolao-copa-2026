@@ -7,39 +7,49 @@ export default async function CadastroPage({
 }: {
   searchParams: Promise<{ error?: string }>
 }) {
-  // Resolvemos a Promise da URL para o Next.js 15+
   const resolvedParams = await searchParams
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-[#0a0a0a] selection:bg-teal-500 selection:text-white relative overflow-hidden">
+    // Removemos a tag 'style' daqui de cima!
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 relative overflow-hidden">
       
-      {/* Efeitos de Luz de Fundo (Glow - usando uma cor levemente mais esmeralda para diferenciar do login) */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-900/20 blur-[120px] pointer-events-none rounded-full"></div>
+      <div 
+        className="absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat scale-250 sm:scale-135 transform-gpu"
+        style={{ backgroundImage: "url('/bg-wc-2026.svg')" }}
+      ></div>
+
+      {/* (Opcional) Uma leve camada escura sobre a imagem para dar mais contraste ao formulário */}
+      {/*<div className="absolute inset-0 -z-10 bg-black/10"></div>*/}
       
       {/* Botão de Voltar */}
       <div className="absolute top-8 left-8 z-20">
-        <Link href="/" className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 text-sm font-semibold">
+        <Link href="/" className="text-white hover:text-gray-200 transition-colors flex items-center gap-2 text-sm font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
           ← Voltar ao Início
         </Link>
       </div>
 
-      <div className="w-full max-w-md p-8 sm:p-10 bg-white/[0.02] border border-white/5 rounded-3xl shadow-2xl backdrop-blur-xl relative z-10 my-8">
+      {/* CAIXA GLASSMORPHISM (Mais transparente e com desfoque) */}
+      <div className="w-[90vw] sm:w-full max-w-md p-10 bg-white/75 border border-white rounded-3xl  relative z-10 transform scale-[0.85] sm:scale-100 origin-center">
         
         {/* Cabeçalho do Cadastro */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-black text-white tracking-tight uppercase mb-1">
-            Entre para o <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">Jogo</span>
-          </h1>
-          <p className="text-gray-400 text-sm">Crie sua conta e faça seus palpites.</p>
+          <div className="flex justify-center mb-4 drop-shadow-lg">
+            <Image 
+              src="/logo-wc-2026-vert.png" 
+              alt="Logo Copa do Mundo 2026" 
+              width={200} 
+              height={200} 
+              className="object-contain"
+            />
+          </div>
         </div>
         
-        {/* Adicionamos action e noValidate */}
         <form action={signup} noValidate className="flex flex-col gap-5">
           
-          {/* Novo Campo: Nome Completo */}
+          {/* Campo: Nome Completo */}
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-              Nome completo
+            <label className="block text-xs font-black text-gray-600 uppercase tracking-widest mb-2 drop-shadow-md">
+              Nome Completo
             </label>
             <input
               id="nome"
@@ -47,14 +57,14 @@ export default async function CadastroPage({
               type="text"
               placeholder="Ex: Ronaldo Fenômeno"
               required
-              className="w-full px-4 py-3.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder:text-gray-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+              className="w-full px-4 py-3.5 bg-white/70  border border-white/10 rounded-xl text-gray-600 placeholder:text-gray-350 focus:bg-white/90 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-all backdrop-blur-sm"
             />
           </div>
 
           {/* Campo de E-mail */}
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-              E-mail
+            <label className="block text-xs font-black text-gray-600 uppercase tracking-widest mb-2 drop-shadow-md">
+              Email
             </label>
             <input
               id="email"
@@ -62,13 +72,13 @@ export default async function CadastroPage({
               type="email"
               placeholder="camisa10@email.com"
               required
-              className="w-full px-4 py-3.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder:text-gray-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+              className="w-full px-4 py-3.5 bg-white/70  border border-white/10 rounded-xl text-gray-600 placeholder:text-gray-350 focus:bg-white/90 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-all backdrop-blur-sm"
             />
           </div>
 
           {/* Campo de Senha */}
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
+            <label className="block text-xs font-black text-gray-600 uppercase tracking-widest mb-2 drop-shadow-md">
               Crie uma Senha
             </label>
             <input
@@ -77,13 +87,13 @@ export default async function CadastroPage({
               type="password"
               placeholder="Mínimo de 6 caracteres"
               required
-              className="w-full px-4 py-3.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder:text-gray-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+              className="w-full px-4 py-3.5 bg-white/70 border border-white/10 rounded-xl text-gray-600 placeholder:text-gray-350 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-all backdrop-blur-sm"
             />
           </div>
 
           {/* Exibição de Erros */}
           {resolvedParams.error && (
-            <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl text-center font-medium backdrop-blur-sm mt-1">
+            <div className="p-4 bg-red-500/90 border border-red-500/100 text-white text-sm rounded-xl text-center font-bold backdrop-blur-md mt-1 shadow-lg">
               {resolvedParams.error}
             </div>
           )}
@@ -92,16 +102,16 @@ export default async function CadastroPage({
           <div className="mt-3">
             <button
               type="submit"
-              className="w-full py-4 px-4 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-black font-black uppercase tracking-wide rounded-xl transition-all shadow-[0_0_20px_-5px_rgba(16,185,129,0.4)] hover:shadow-[0_0_30px_-5px_rgba(16,185,129,0.6)] transform hover:-translate-y-0.5"
+              className="w-full py-4 px-4 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white font-black uppercase tracking-wide rounded-xl transition-all shadow-[0_4px_15px_rgba(16,185,129,0.5)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.7)] transform hover:-translate-y-0.5"
             >
               Confirmar Inscrição
             </button>
             
-            <div className="mt-5 text-center text-sm text-gray-400">
-              Já faz parte do bolão?{' '}
+            <div className="mt-5 text-center text-sm">
+              <span className="text-gray-600 font-medium drop-shadow-lg">Já faz parte do bolão? </span>
               <Link
                 href="/login"
-                className="text-white font-bold hover:text-emerald-400 transition-colors underline decoration-white/20 underline-offset-4"
+                className="text-gray-600 font-black hover:text-emerald-500 transition-colors underline decoration-gray-600/40 underline-offset-4 drop-shadow-lg"
               >
                 Faça login aqui
               </Link>
@@ -110,8 +120,8 @@ export default async function CadastroPage({
         </form>
       </div>
 
-      <div className="mt-4 text-center text-xs text-gray-600 relative z-10 mb-8">
-        <p>Ao se cadastrar, leia atentamente o regulamento.</p>
+      <div className="text-center text-xs text-white/70 font-medium relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+        <p>Este bolão destina-se exclusivamente à participação de amigos.</p>
       </div>
     </div>
   )
