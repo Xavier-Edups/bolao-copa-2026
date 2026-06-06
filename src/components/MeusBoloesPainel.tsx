@@ -68,7 +68,7 @@ export default function MeusBoloesPainel() {
                   onClick={() => handleAbrirBolao(bolao)}
                   className="p-4 bg-white/5 border border-white/10 rounded-xl text-left text-white font-bold hover:bg-white/10 hover:border-teal-500/30 transition-all flex justify-between items-center group/item"
                 >
-                  <span>{bolao.name || bolao.nome}</span>
+                  <span>{bolao.nome}</span>
                   <span className="text-xs text-teal-400 opacity-0 group-hover/item:opacity-100 transition-opacity">Preencher Palpites →</span>
                 </button>
               ))}
