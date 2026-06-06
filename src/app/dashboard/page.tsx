@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { logout } from '../auth/actions'
 import Link from 'next/link'
 import RegulamentoModal from '@/components/RegulamentoModal'
+import MeusBoloesPainel from '@/components/MeusBoloesPainel'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -52,29 +53,7 @@ export default async function DashboardPage() {
       <main className="relative z-10 max-w-7xl mx-auto px-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         
         {/* Painel 1: Meus Bolões */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl md:col-span-2 flex flex-col justify-between group hover:border-teal-500/20 transition-all">
-          <div>
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <span>🎟️</span> Meus Bolões
-              </h2>
-              <span className="text-[10px] font-bold bg-teal-500/10 text-teal-400 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                Ativos
-              </span>
-            </div>
-            
-            {/* Estado Vazio (Ainda não criou bolão) */}
-            <div className="border-2 border-dashed border-white/5 rounded-2xl p-8 text-center my-4 bg-black/20">
-              <span className="text-3xl mb-2 block">🔮</span>
-              <p className="text-sm font-semibold text-gray-300">Você ainda não tem nenhum palpite salvo</p>
-              <p className="text-xs text-gray-500 mt-1 max-w-xs mx-auto">Crie seu bilhete de apostas e garanta sua vaga antes da abertura da Copa.</p>
-            </div>
-          </div>
-
-          <button className="w-full sm:w-auto self-end mt-4 py-3 px-6 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-black font-black uppercase text-xs tracking-wider rounded-xl transition-all shadow-md transform hover:-translate-y-0.5">
-            + Criar Novo Palpite
-          </button>
-        </div>
+        <MeusBoloesPainel /> 
 
         {/* Painel 2: Status do Pagamento */}
         <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col justify-between group hover:border-amber-500/20 transition-all">
