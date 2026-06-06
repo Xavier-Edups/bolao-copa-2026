@@ -9,7 +9,7 @@ export default function Countdown() {
     setMounted(true)
     // O grande jogo de abertura: México x África do Sul no Estádio Azteca
     // Horário oficial: 11 de Junho de 2026 às 21:00 (Horário de Brasília)
-    const targetDate = new Date('2026-06-11T21:00:00-03:00').getTime()
+    const targetDate = new Date('2026-06-11T14:00:00-03:00').getTime()
 
     const updateTimer = () => {
       const now = new Date().getTime()
