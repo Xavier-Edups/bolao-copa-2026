@@ -120,7 +120,7 @@ export default async function CadastroPage({
         </form>
       </div>
 
-      <div className="text-center text-xs text-white/70 font-medium relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+      <div className="mt-2 text-center text-xs text-white/70 font-medium relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
         <p>Este bolão destina-se exclusivamente à participação de amigos.</p>
       </div>
     </div>
