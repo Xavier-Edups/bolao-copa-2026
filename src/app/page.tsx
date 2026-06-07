@@ -9,11 +9,12 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-screen text-white font-sans overflow-hidden selection:bg-teal-500 selection:text-white">
-      
+      {/*
       <div 
         className="fixed inset-0 -z-20 bg-[42%_center] bg-no-repeat scale-250 sm:scale-335 transform-gpu"
         style={{ backgroundImage: "url('/bg-wc-2026.svg')" }}
       ></div>
+      */}
       {/* Luz de Fundo (Glow Effect) */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[600px] bg-gradient-to-b from-teal-900/40 via-emerald-900/10 to-transparent blur-3xl pointer-events-none -z-10"></div>
 
@@ -45,7 +46,7 @@ export default async function LandingPage() {
         {/* Emblema da Marca Estilizado */}
           <div className="flex justify-center mb-15 drop-shadow-lg">
             <Image 
-              src="/logo-wc-2026-vert.png" 
+              src="/logo-wc-2026-vert2.png" 
               alt="Logo Copa do Mundo 2026" 
               width={250} 
               height={250} 

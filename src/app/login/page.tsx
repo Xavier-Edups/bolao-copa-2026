@@ -18,7 +18,7 @@ export default async function LoginPage({
       */}
       <div 
         className="absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat scale-250 sm:scale-135 transform-gpu"
-        style={{ backgroundImage: "url('/bg-wc-2026.svg')" }}
+        style={{ backgroundImage: "url('/bg-wc-2026-2.svg')" }}
       ></div>
 
       {/* Botão de Voltar (Com drop-shadow para não sumir no fundo colorido) */}
@@ -35,7 +35,7 @@ export default async function LoginPage({
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4 drop-shadow-lg">
             <Image 
-              src="/logo-wc-2026-vert.png" 
+              src="/logo-wc-2026-vert2.png" 
               alt="Logo Copa do Mundo 2026" 
               width={200} 
               height={200} 

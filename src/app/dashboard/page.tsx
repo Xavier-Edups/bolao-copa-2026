@@ -11,6 +11,16 @@ export default async function DashboardPage() {
   // Recupera o usuário logado
   const { data: { user } } = await supabase.auth.getUser()
 
+  let qtdBoloes = 0
+  if (user) {
+    const { count } = await supabase
+      .from('boloes')
+      .select('*', { count: 'exact', head: true }) // head: true diz pro Supabase não baixar os dados, só contar as linhas!
+      .eq('user_id', user.id)
+
+    qtdBoloes = count || 0
+  }
+
   // Proteção: Se não estiver logado, joga para a tela de login
   if (!user) {
     redirect('/login')
@@ -43,8 +53,10 @@ export default async function DashboardPage() {
     .from('jogadores')
     .select('id, nome, time_id, posicao')
     .order('nome', { ascending: true })
+    .limit(3000)
 
-  //console.log(partidas2f)
+  console.log(qtdBoloes)
+
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans relative overflow-hidden pb-12 selection:bg-teal-500 selection:text-white">
@@ -81,6 +93,7 @@ export default async function DashboardPage() {
         
         {/* Painel 1: Meus Bolões */}
         <MeusBoloesPainel
+          username={nomeUsuario ?? ''}
           partidas1f={partidas1f || []}
           partidas2f={partidas2f || []}
           times={times || []}
@@ -140,7 +153,7 @@ export default async function DashboardPage() {
             <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-4 mt-4 flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block">Total a pagar</span>
-                <span className="text-xl font-black text-white">R$ {30*1},00</span>
+                <span className="text-xl font-black text-white">R$ {30*qtdBoloes},00</span>
               </div>
               <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full uppercase">Pendente</span>
             </div>

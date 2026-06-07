@@ -1,5 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/utils/supabase/client'
+import { useRouter } from 'next/navigation'
 
 interface Bolao {
   id: string
@@ -32,7 +34,10 @@ interface Jogador {
   posicao: string
 }
 
-export default function MeusBoloesPainel({ partidas1f, partidas2f, times, jogadores }: { partidas1f: Partida[], partidas2f: Partida[], times: TimeCopa[], jogadores: Jogador[] }) {
+export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jogadores, username }: { partidas1f: Partida[], partidas2f: Partida[], times: TimeCopa[], jogadores: Jogador[], username: string }) {
+  const router = useRouter()
+  const supabase = createClient()
+  const [isSaving, setIsSaving] = useState(false)
   const [boloes, setBoloes] = useState<Bolao[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [bolaoAtivo, setBolaoAtivo] = useState<Bolao | null>(null)
@@ -54,7 +59,241 @@ export default function MeusBoloesPainel({ partidas1f, partidas2f, times, jogado
     luvaDeOuro: { timeId: string, jogador: string };
   }>>({})
 
-  const handleCriarBolao = () => {
+  // =======================================================================
+  // EFEITO DE CARREGAMENTO: Puxa os dados da nuvem ao abrir a página
+  // =======================================================================
+  useEffect(() => {
+    const carregarDadosSalvos = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return // Se não estiver logado, não faz nada
+
+      try {
+        // 1. Busca os Bolões do usuário
+        const { data: boloesDB } = await supabase.from('boloes').select('*')
+
+        if (boloesDB) {
+          setBoloes(boloesDB)
+        }
+        
+        // DICA: Se você tem um estado (useState) que guarda a lista dos bolões criados 
+        // para renderizar na tela inicial, você deve atualizá-lo aqui. 
+        // Exemplo: se for `const [meusBoloes, setMeusBoloes] = useState([])`
+        // Descomente e use: setMeusBoloes(boloesDB || [])
+
+        // 2. Busca todos os palpites desse usuário de uma vez só!
+        // Como o RLS está ativado, o Supabase magicamente só vai trazer os dados dele.
+        const [resJogos, resGrupos, resMata, resPremios] = await Promise.all([
+          supabase.from('palpites_jogos').select('*'),
+          supabase.from('palpites_grupos').select('*'),
+          supabase.from('palpites_matamata').select('*'),
+          supabase.from('palpites_premios').select('*')
+        ])
+
+        // 3. RECONSTRUINDO AS MEMÓRIAS DO REACT DE TRÁS PRA FRENTE
+        // A) Jogos 
+        const rec1aFase: Record<string, Record<string, { casa: string, fora: string }>> = {}
+        const rec2aFase: Record<string, Record<string, { casa: string, fora: string }>> = {}
+        const todasAsPartidas = [...partidas1f, ...partidas2f] // Junta as duas props
+        
+        resJogos.data?.forEach(p => {
+          // O banco salva o fixture_id (número), precisamos achar o ID original (UUID)
+          const jogoOriginal = todasAsPartidas.find(j => j.fixture_id === p.partida_id)
+          
+          if (jogoOriginal) {
+            const is1aFase = partidas1f.some(j => j.id === jogoOriginal.id)
+            const target = is1aFase ? rec1aFase : rec2aFase
+            
+            if (!target[p.bolao_id]) target[p.bolao_id] = {}
+            target[p.bolao_id][jogoOriginal.id] = { casa: p.gols_casa.toString(), fora: p.gols_fora.toString() }
+          }
+        })
+        setPalpites1aFase(rec1aFase)
+        setPalpites2aFase(rec2aFase)
+
+        // B) Grupos
+        const recGrupos: Record<string, Record<number, string>> = {}
+        resGrupos.data?.forEach(p => {
+          if (!recGrupos[p.bolao_id]) recGrupos[p.bolao_id] = {}
+          recGrupos[p.bolao_id][p.time_id] = p.posicao.toString()
+        })
+        setPalpitesGrupos(recGrupos)
+
+        // C) Mata-Mata
+        const recMata: any = {}
+        resMata.data?.forEach(p => {
+          if (!recMata[p.bolao_id]) {
+            recMata[p.bolao_id] = { r32: {}, r16: {}, qf: {}, sf: {}, campeao: '', vice: '' }
+          }
+          if (p.fase === 'campeao' || p.fase === 'vice') {
+            recMata[p.bolao_id][p.fase] = p.time_id.toString()
+          } else {
+            recMata[p.bolao_id][p.fase][p.posicao_index] = p.time_id.toString()
+          }
+        })
+        setPalpitesMataMata(recMata)
+
+        // D) Prêmios (Fazemos a engenharia reversa para achar o NOME do jogador pelo ID)
+        const recPremios: any = {}
+        resPremios.data?.forEach(p => {
+          if (!recPremios[p.bolao_id]) {
+            recPremios[p.bolao_id] = {
+              bolaDeOuro: { timeId: '', jogador: '' },
+              chuteiraDeOuro: { timeId: '', jogador: '' },
+              luvaDeOuro: { timeId: '', jogador: '' }
+            }
+          }
+          const jogador = jogadores.find(j => j.id === p.jogador_id)
+          if (jogador) {
+            recPremios[p.bolao_id][p.premio] = { timeId: p.time_id.toString(), jogador: jogador.nome }
+          }
+        })
+        setPalpitesPremios(recPremios)
+
+      } catch (error) {
+        console.error("Erro ao carregar dados salvos da nuvem:", error)
+      }
+    }
+
+    carregarDadosSalvos()
+  }, [partidas1f, jogadores]) // Se as props de base mudarem, ele recalcula
+
+  const handleSalvarBolao = async () => {
+    if (!bolaoAtivo) return
+    setIsSaving(true)
+
+    try {
+      const bolaoId = bolaoAtivo.id
+
+      // ==========================================
+      // 0. SALVAR O BOLÃO PAI PRIMEIRO
+      // ==========================================
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        alert('Você precisa estar logado para salvar.')
+        setIsSaving(false)
+        return
+      }
+
+      // Faz um Upsert (Cria se não existir, atualiza se já existir) na tabela de bolões
+      const { error: erroBolao } = await supabase
+        .from('boloes')
+        .upsert({
+          id: bolaoId,
+          user_id: user.id,
+          nome: bolaoAtivo.nome
+        })
+
+      if (erroBolao) throw erroBolao
+
+      // ==========================================
+      // 1. EMPACOTANDO OS DADOS
+      // ==========================================
+
+      // A) Jogos (1ª e 2ª Fase unidas)
+      const p1 = palpites1aFase[bolaoId] || {}
+      const p2 = palpites2aFase[bolaoId] || {}
+      const jogosParaSalvar: any[] = []
+      const todasAsPartidas = [...partidas1f, ...partidas2f]
+      
+      ;[...Object.entries(p1), ...Object.entries(p2)].forEach(([partidaId, placar]) => {
+        if (placar.casa !== '' && placar.fora !== '') {
+          // Pega o número real (fixture_id) em vez do UUID para o banco não recusar
+          const jogoOriginal = todasAsPartidas.find(j => j.id === partidaId)
+          if (jogoOriginal) {
+            jogosParaSalvar.push({
+              bolao_id: bolaoId,
+              partida_id: jogoOriginal.fixture_id, 
+              gols_casa: parseInt(placar.casa),
+              gols_fora: parseInt(placar.fora)
+            })
+          }
+        }
+      })
+
+      // B) Classificação dos Grupos
+      const pGrupos = palpitesGrupos[bolaoId] || {}
+      const gruposParaSalvar = Object.entries(pGrupos)
+        .filter(([_, posicao]) => posicao !== '')
+        .map(([timeId, posicao]) => ({
+          bolao_id: bolaoId,
+          time_id: parseInt(timeId),
+          posicao: parseInt(posicao as string)
+        }))
+
+      // C) Mata-Mata (Funil)
+      const pMata = palpitesMataMata[bolaoId] || { r32: {}, r16: {}, qf: {}, sf: {}, campeao: '', vice: '' }
+      const mataMataParaSalvar: any[] = []
+      const fasesArr = ['r32', 'r16', 'qf', 'sf'] as const
+      
+      fasesArr.forEach(fase => {
+        Object.entries(pMata[fase]).forEach(([index, timeId]) => {
+          if (timeId) mataMataParaSalvar.push({ bolao_id: bolaoId, fase: fase, posicao_index: parseInt(index), time_id: parseInt(timeId) })
+        })
+      })
+      if (pMata.campeao) mataMataParaSalvar.push({ bolao_id: bolaoId, fase: 'campeao', posicao_index: 0, time_id: parseInt(pMata.campeao) })
+      if (pMata.vice) mataMataParaSalvar.push({ bolao_id: bolaoId, fase: 'vice', posicao_index: 0, time_id: parseInt(pMata.vice) })
+
+      // D) Prêmios Individuais
+      const pPremios = palpitesPremios[bolaoId] || {}
+      const premiosParaSalvar: any[] = []
+      const chavesPremios = ['bolaDeOuro', 'chuteiraDeOuro', 'luvaDeOuro'] as const
+      
+      chavesPremios.forEach(premio => {
+        const p = pPremios[premio]
+        if (p && p.timeId && p.jogador) {
+          // Busca o ID do jogador baseado no nome que estava no Select
+          const jogadorObj = jogadores.find(j => j.nome === p.jogador && j.time_id.toString() === p.timeId)
+          if (jogadorObj) {
+            premiosParaSalvar.push({
+              bolao_id: bolaoId,
+              premio: premio,
+              time_id: parseInt(p.timeId),
+              jogador_id: jogadorObj.id
+            })
+          }
+        }
+      })
+
+      // ==========================================
+      // 2. EXECUTANDO NO SUPABASE (Com trava anti-falha silenciosa)
+      // ==========================================
+
+      // O .throwOnError() obriga o Supabase a parar e mostrar o erro no catch!
+      await Promise.all([
+        supabase.from('palpites_jogos').delete().eq('bolao_id', bolaoId).throwOnError(),
+        supabase.from('palpites_grupos').delete().eq('bolao_id', bolaoId).throwOnError(),
+        supabase.from('palpites_matamata').delete().eq('bolao_id', bolaoId).throwOnError(),
+        supabase.from('palpites_premios').delete().eq('bolao_id', bolaoId).throwOnError()
+      ])
+
+      // Insere as listas novas
+      const promessasInsert = []
+      if (jogosParaSalvar.length > 0) promessasInsert.push(supabase.from('palpites_jogos').insert(jogosParaSalvar).throwOnError())
+      if (gruposParaSalvar.length > 0) promessasInsert.push(supabase.from('palpites_grupos').insert(gruposParaSalvar).throwOnError())
+      if (mataMataParaSalvar.length > 0) promessasInsert.push(supabase.from('palpites_matamata').insert(mataMataParaSalvar).throwOnError())
+      if (premiosParaSalvar.length > 0) promessasInsert.push(supabase.from('palpites_premios').insert(premiosParaSalvar).throwOnError())
+
+      await Promise.all(promessasInsert)
+
+      // Sucesso!
+      //alert('Palpites salvos com sucesso na nuvem! 🏆')
+      setBolaoAtivo(null) 
+      
+    } catch (error) {
+      console.error("Erro ao salvar bolão:", error)
+      alert('Ops! Tivemos um erro ao salvar seus palpites. Tente novamente.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+  
+ // NOVA FUNÇÃO ATUALIZADA: Criar Bolão
+  const handleCriarBolao = async () => {
+    // Pega o usuário para poder salvar no banco
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return alert('Faça login para criar um bolão.')
+
     const numerosUtilizados = boloes.map(b => {
       const match = b.nome.match(/BOLÃO (\d+)/)
       return match ? parseInt(match[1]) : 0
@@ -65,20 +304,30 @@ export default function MeusBoloesPainel({ partidas1f, partidas2f, times, jogado
       proximoNumero++
     }
 
-    const novoBolao: Bolao = {
+    // Objeto completo para o banco de dados
+    const novoBolaoDB = {
       id: crypto.randomUUID(), 
-      nome: `BOLÃO ${proximoNumero}`
+      nome: `BOLÃO ${proximoNumero}`,
+      user_id: user.id
     }
 
-    setBoloes([...boloes, novoBolao])
-  }
+    try {
+      // 1. Salva no Supabase na mesma hora
+      const { error } = await supabase.from('boloes').insert(novoBolaoDB)
+      if (error) throw error
 
-  // Abre a cartela
-  const handleAbrirBolao = (bolao: Bolao) => {
-    setBolaoAtivo(bolao)
-    setAbaAtiva('1a_fase') 
-    setIsModalOpen(true)
-  }
+      // 2. Atualiza a tela local (Omitindo o user_id para respeitar sua Interface)
+      const novoBolaoLocal: Bolao = { id: novoBolaoDB.id, nome: novoBolaoDB.nome }
+      setBoloes([...boloes, novoBolaoLocal])
+
+      // 3. A MÁGICA: Manda o page.tsx atualizar o preço sem dar F5!
+      router.refresh()
+      
+    } catch (error) {
+      console.error("Erro ao criar bolão no banco:", error)
+      alert('Ops! Tivemos um erro ao criar o bolão.')
+    }
+  } 
 
   // NOVA FUNÇÃO: Editar Nome do Bolão
   const handleEditarBolao = (id: string, nomeAtual: string) => {
@@ -92,13 +341,37 @@ export default function MeusBoloesPainel({ partidas1f, partidas2f, times, jogado
     }
   }
 
-  // NOVA FUNÇÃO: Excluir Bolão
-  const handleExcluirBolao = (id: string) => {
-    const confirmacao = window.confirm('Tem certeza que deseja excluir este bolão? Todos os palpites salvos nele serão perdidos.')
+ // NOVA FUNÇÃO: Excluir Bolão (Agora integrada com o Supabase)
+  const handleExcluirBolao = async (id: string) => {
+    const confirmacao = window.confirm('Tem certeza que deseja excluir este bolão? Todos os palpites salvos nele serão perdidos para sempre.')
+    
     if (confirmacao) {
-      setBoloes(boloes.filter(b => b.id !== id))
+      try {
+        // 1. Manda o Supabase deletar no banco de dados
+        const { error } = await supabase
+          .from('boloes')
+          .delete()
+          .eq('id', id)
+
+        if (error) throw error
+
+        // 2. Se o banco deletou com sucesso, nós removemos da tela instantaneamente
+        setBoloes(boloes.filter(b => b.id !== id))
+        
+        // Se o bolão excluído era o que estava aberto no momento, fecha o modal
+        if (bolaoAtivo?.id === id) {
+          setBolaoAtivo(null)
+          setIsModalOpen(false)
+        }
+
+        router.refresh()
+
+      } catch (error) {
+        console.error("Erro ao excluir bolão do banco:", error)
+        alert('Ops! Tivemos um problema de conexão ao excluir o bolão. Tente novamente.')
+      }
     }
-  }
+  } 
 
   const handlePremioChange = (premio: 'bolaDeOuro' | 'chuteiraDeOuro' | 'luvaDeOuro', campo: 'timeId' | 'jogador', valor: string) => {
     if (!bolaoAtivo) return
@@ -253,12 +526,11 @@ export default function MeusBoloesPainel({ partidas1f, partidas2f, times, jogado
                     onClick={() => handleAbrirBolao(bolao)}
                     className="flex-1 text-left text-white font-bold flex flex-col justify-center outline-none"
                   >
-                    <span className="truncate text-emerald-400 hover:text-emerald-300 text-xl">{bolao.nome}</span>
+                    <span className="truncate text-emerald-400 hover:text-emerald-300 text-xl">{bolao.nome} ▸</span>
                   </button>
 
                   {/* Grupo de Ações (Excluir) */}
                   <div className="flex items-center gap-1 ml-2">
-                      <span className="text-[35px] text-emerald-400">▸</span>
                     <button
                       onClick={() => handleExcluirBolao(bolao.id)}
                       title="Excluir"
@@ -291,13 +563,25 @@ export default function MeusBoloesPainel({ partidas1f, partidas2f, times, jogado
             <div className="p-6 border-b border-white/5 flex justify-between items-center bg-black/40 backdrop-blur-md">
               <div>
                 <span className="text-xs font-bold uppercase tracking-[0.2em] text-teal-400">Cartela de Palpites</span>
-                <h3 className="text-xl font-black text-white uppercase mt-0.5">{bolaoAtivo.nome}</h3>
+                <h3 className="text-xl font-black text-white uppercase mt-0.5">{username} / {bolaoAtivo.nome}</h3>
               </div>
               <button 
-                onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-white text-xs font-bold bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full transition-colors"
+                onClick={handleSalvarBolao}
+                disabled={isSaving}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border border-white/10 ${
+                  isSaving 
+                    ? 'bg-teal-500 text-white cursor-wait opacity-80' 
+                    : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white'
+                }`}
               >
-                Salvar e Fechar
+              {isSaving ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Salvando...
+                </span>
+                ) : (
+                  'Salvar e Fechar'
+                )}
               </button>
             </div>
 
@@ -347,7 +631,7 @@ export default function MeusBoloesPainel({ partidas1f, partidas2f, times, jogado
                                   /* Atualizado para ler a camada do bolaoAtivo.id */
                                   value={palpites1aFase[bolaoAtivo.id]?.[jogo.id]?.casa ?? ''}
                                   onChange={(e) => handlePalpite1aFase(jogo.id, 'casa', e.target.value)}
-                                  className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black/60 border border-white/10 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
+                                  className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black border border-white/40 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
                                 />
                                 <span className="text-gray-500 font-bold text-xs sm:text-sm">X</span>
                                 <input 
@@ -358,7 +642,7 @@ export default function MeusBoloesPainel({ partidas1f, partidas2f, times, jogado
                                   /* Atualizado para ler a camada do bolaoAtivo.id */
                                   value={palpites1aFase[bolaoAtivo.id]?.[jogo.id]?.fora ?? ''}
                                   onChange={(e) => handlePalpite1aFase(jogo.id, 'fora', e.target.value)}
-                                  className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black/60 border border-white/10 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
+                                  className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black border border-white/40 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
                                 />
                               </div>
                               <div className="flex flex-col items-center gap-1 w-16 sm:w-28 overflow-hidden shrink-0">
@@ -597,10 +881,10 @@ export default function MeusBoloesPainel({ partidas1f, partidas2f, times, jogado
 
                 // Matriz para desenhar os layouts em grade magicamente
                 const blocosMataMata: Array<{ key: 'r32' | 'r16' | 'qf' | 'sf', label: string, count: number, opcoes: TimeCopa[] }> = [
-                  { key: 'r32', label: '16-avos de Final (32 Times)', count: 32, opcoes: times }, // Na copa de 2026 passam 32
-                  { key: 'r16', label: 'Oitavas de Final (16 Times)', count: 16, opcoes: opcoesR16 },
-                  { key: 'qf', label: 'Quartas de Final (8 Times)', count: 8, opcoes: opcoesQf },
-                  { key: 'sf', label: 'Semifinais (4 Times)', count: 4, opcoes: opcoesSf },
+                  { key: 'r32', label: 'Eliminatórios (32 Seleções)', count: 32, opcoes: times }, // Na copa de 2026 passam 32
+                  { key: 'r16', label: 'Oitavas de Final (16 Seleções)', count: 16, opcoes: opcoesR16 },
+                  { key: 'qf', label: 'Quartas de Final (8 Seleções)', count: 8, opcoes: opcoesQf },
+                  { key: 'sf', label: 'Semifinais (4 Seleções)', count: 4, opcoes: opcoesSf },
                 ]
 
                 return (
