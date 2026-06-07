@@ -7,7 +7,7 @@ export default function RegulamentoModal() {
   return (
     <>
       {/* Botão no Dashboard */}
-      <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col justify-between group hover:border-gray-500/20 transition-all">
+      <div className="bg-white/[0.02] border border-emerald-600 rounded-3xl p-6 backdrop-blur-xl flex flex-col justify-between group transition-all">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-4">
             <span>📜</span> Regulamento
@@ -93,7 +93,7 @@ export default function RegulamentoModal() {
               <section>
                 <h4 className="text-lg font-bold text-white mb-3 flex items-center gap-2"><span className="text-teal-400">#</span> Pontuação</h4>
                 
-                <div className="grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
                   <div className="bg-white/[0.02] border border-white/5 p-4 rounded-xl">
                     <h5 className="font-bold text-white mb-2">Partidas (1ª e 2ª Fase)</h5>
                     <ul className="space-y-1">
@@ -104,12 +104,12 @@ export default function RegulamentoModal() {
                     <p className="text-[10px] mt-2 text-amber-400/80 leading-tight">Válido apenas os 90 min (sem prorrogação/pênaltis).</p>
                   </div>
 
-                  <div className="bg-white/[0.02] border border-white/5 p-4 rounded-xl">
+                  <div className="bg-white/[0.02] border border-white/5 p-4 rounded-xl mt-4">
                     <h5 className="font-bold text-white mb-2">Grupos</h5>
                     <p>Acertar colocação exata da seleção no grupo: <strong className="text-teal-400">3 pts</strong> <span className="text-xs text-teal-400">(para cada acerto)</span></p>
                   </div>
 
-                  <div className="bg-white/[0.02] border border-white/5 p-4 rounded-xl sm:col-span-2">
+                  <div className="bg-white/[0.02] border border-white/5 p-4 rounded-xl sm:col-span-2 mt-4">
                     <h5 className="font-bold text-white mb-2">Classificados (Eliminatórias)</h5>
                     <ul className="space-y-2 grid sm:grid-cols-1 gap-x-4">
                       <li>Acertar seleção classificada para as  Eliminatórias: <strong className="text-teal-400">1 pt</strong> <span className="text-xs text-teal-400">(bônus: +8 pts se acertar as 32 seleções)</span></li>
@@ -121,7 +121,7 @@ export default function RegulamentoModal() {
                     </ul>
                   </div>
 
-                  <div className="bg-white/[0.02] border border-white/5 p-4 rounded-xl sm:col-span-2 flex justify-between items-center">
+                  <div className="bg-white/[0.02] border border-white/5 p-4 rounded-xl sm:col-span-2 flex justify-between items-center mt-4">
                     <div>
                       <h5 className="font-bold text-white mb-2">Prêmios Individuais</h5>
                       <ul className="space-y-2 grid sm:grid-cols-1 gap-x-4">
