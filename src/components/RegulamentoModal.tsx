@@ -70,7 +70,7 @@ export default function RegulamentoModal() {
               {/* Seção: Palpites e Cronograma */}
               <section>
                 <h4 className="text-lg font-bold text-white mb-3 flex items-center gap-2"><span className="text-teal-400">#</span> Palpites & Prazos</h4>
-                <p>Os palpites estão divididos em 6 etapas: <strong>1ª Fase</strong>, <strong>Grupos</strong>, <strong>Classificados</strong>, <strong>2ª Fase</strong>, <strong>Bola de Ouro</strong> (melhor jogador da copa), <strong>Chuteira de Ouro</strong> (Artilheiro) e <strong>Luva de Ouro</strong> (melhor goleiro).</p>
+                <p>Os palpites estão divididos em 7 etapas: <strong>1ª Fase</strong>, <strong>Grupos</strong>, <strong>Classificados</strong>, <strong>2ª Fase</strong>, <strong>Bola de Ouro</strong> (melhor jogador da copa), <strong>Chuteira de Ouro</strong> (Artilheiro) e <strong>Luva de Ouro</strong> (melhor goleiro).</p>
                 
                 <div className="space-y-3 mt-4 text-gray-300">
                   <p><strong>1ª Fase:</strong> Preenchimento dos resultados das 72 partidas iniciais.</p>
