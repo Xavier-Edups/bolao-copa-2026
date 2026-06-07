@@ -268,7 +268,7 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
       ])
 
       // Insere as listas novas
-      const promessasInsert = []
+      const promessasInsert: any[] = []
       if (jogosParaSalvar.length > 0) promessasInsert.push(supabase.from('palpites_jogos').insert(jogosParaSalvar).throwOnError())
       if (gruposParaSalvar.length > 0) promessasInsert.push(supabase.from('palpites_grupos').insert(gruposParaSalvar).throwOnError())
       if (mataMataParaSalvar.length > 0) promessasInsert.push(supabase.from('palpites_matamata').insert(mataMataParaSalvar).throwOnError())
@@ -328,6 +328,12 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
       alert('Ops! Tivemos um erro ao criar o bolão.')
     }
   } 
+
+const handleAbrirBolao = (bolao: Bolao) => {
+    setBolaoAtivo(bolao)
+    setAbaAtiva('1a_fase') 
+    setIsModalOpen(true)
+  }
 
   // NOVA FUNÇÃO: Editar Nome do Bolão
   const handleEditarBolao = (id: string, nomeAtual: string) => {
