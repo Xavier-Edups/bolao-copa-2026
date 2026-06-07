@@ -8,7 +8,7 @@ export default async function LandingPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   return (
-    <div className="min-h-screen text-white font-sans overflow-hidden selection:bg-teal-500 selection:text-white">
+    <div className="min-h-screen text-white bg-black font-sans overflow-hidden selection:bg-teal-500 selection:text-white">
       {/*
       <div 
         className="fixed inset-0 -z-20 bg-[42%_center] bg-no-repeat scale-250 sm:scale-335 transform-gpu"
