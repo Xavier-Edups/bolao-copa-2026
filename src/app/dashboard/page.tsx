@@ -29,11 +29,10 @@ export default async function DashboardPage() {
     valorPago = pagData?.valor_pago || 0
   }
   const valorTotal = qtdBoloes * 30
-  const saldoDevedor = valorTotal - valorPago
+  const saldoDevedor = Math.max(0, valorTotal - valorPago)
+  const temCredito = valorPago > valorTotal
+  const isPago = (qtdBoloes > 0 && saldoDevedor === 0) || temCredito
   
-  // Só considera pago se tiver pelo menos 1 bolão e não dever nada
-  const isPago = qtdBoloes > 0 && saldoDevedor <= 0
-
   // Proteção: Se não estiver logado, joga para a tela de login
   if (!user) {
     redirect('/login')
@@ -157,15 +156,17 @@ export default async function DashboardPage() {
           isPago ? 'border-emerald-600/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'border-emerald-600'
         }`}>
           <div>
+            {/* Cabeçalho com Título e Valor Pago Alinhados */}
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <span>💳</span> Pagamento
               </h2>
               
-              <div className="text-[10px] text-gray-400 bg-white/2 border border-white/10 px-3 py-1.5 rounded-lg">
+              <div className="text-[10px] text-gray-400 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg">
                 Já pago: <span className="text-white font-bold ml-1 tracking-wider">{valorPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
               </div>
-            </div> 
+            </div>
+
             <p className="text-xs text-gray-400 leading-relaxed">
               Cada bolão tem o valor de R$30,00. Garanta já a sua participação!
             </p>
@@ -180,12 +181,13 @@ export default async function DashboardPage() {
                 <span className={`text-[10px] font-bold uppercase tracking-widest block transition-colors ${
                   isPago ? 'text-emerald-400' : 'text-amber-400'
                 }`}>
-                  {isPago ? 'Pagamento Concluído' : 'Total a pagar'}
+                  {temCredito ? 'Crédito Disponível' : isPago ? 'Pagamento Concluído' : 'Total a pagar'}
                 </span>
                 
-                {/* Se estiver pendente, mostra a diferença a pagar (caso ele tenha pago parcial). Se pagou tudo, mostra o total. */}
                 <span className="text-xl font-black text-white">
-                  {isPago 
+                  {temCredito 
+                    ? (valorPago - valorTotal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                    : isPago 
                     ? valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
                     : saldoDevedor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
                   }
@@ -197,7 +199,7 @@ export default async function DashboardPage() {
                   ? 'text-emerald-400 bg-emerald-500/10' 
                   : 'text-amber-400 bg-amber-500/10'
               }`}>
-                {isPago ? 'Pago' : 'Pendente'}
+                {temCredito ? 'Crédito' : isPago ? 'Pago' : 'Pendente'}
               </span>
             </div>
           </div>
@@ -205,7 +207,7 @@ export default async function DashboardPage() {
           {/* Botão Condicional */}
           {!isPago ? (
             <Link 
-              href={`https://wa.me/5531983315182?text=${encodeURIComponent(`Olá! Sou ${nomeUsuario}. Gostaria de realizar o pagamento dos meus ${qtdBoloes} bolões. O saldo pendente é de R$ ${saldoDevedor.toFixed(2).replace('.', ',')}.`)}`} 
+              href={`https://wa.me/5531983315182?text=${encodeURIComponent(`Olá! Sou ${nomeUsuario}. Gostaria de realizar o pagamento da minha participação. O saldo pendente é de R$ ${saldoDevedor.toFixed(2).replace('.', ',')}.`)}`} 
               target="_blank"
               className="w-full mt-6 py-3 px-4 bg-white/5 border border-white/10 hover:bg-white/10 text-amber-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors text-center"
             >
@@ -213,11 +215,11 @@ export default async function DashboardPage() {
             </Link>
           ) : (
             <div className="w-full mt-6 py-3 px-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-xs uppercase tracking-wider rounded-xl text-center flex items-center justify-center gap-2">
-              <span>Todos os seus bolões estão válidos!</span>
+              <span>{temCredito ? 'Crédito liberado para jogar!' : 'Tudo Certo!'}</span>
             </div>
           )}
         </div>
-        
+
         {/* Painel 5: Regulamento (Componente de Cliente) */}
         <RegulamentoModal />
 
