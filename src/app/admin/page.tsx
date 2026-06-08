@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 
 interface UsuarioPagamento {
   user_id: string
+  nome_completo: string
   email: string
   valor_pago: number
   updated_at: string
@@ -142,7 +143,11 @@ export default function AdminPagamentos() {
                 ) : (
                   usuarios.map((user) => (
                     <tr key={user.user_id} className="hover:bg-zinc-900/20 transition-colors">
-                      <td className="p-4 font-medium text-white max-w-[200px] truncate">{user.email}</td>
+                      <td className="p-4 font-medium text-white max-w-[300px] truncate">
+                        <span className="text-white font-bold capitalize">{user.nome_completo}</span>
+                        <span className="text-white font-black mx-2">/</span>
+                        <span className="text-white text-xs">{user.email}</span>
+                      </td>
                       <td className="p-4 text-center text-xs text-gray-500">
                         {new Date(user.updated_at).toLocaleDateString('pt-BR')} às {new Date(user.updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                       </td>
