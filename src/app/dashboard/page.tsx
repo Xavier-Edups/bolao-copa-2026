@@ -12,14 +12,27 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   let qtdBoloes = 0
+  let valorPago = 0
+
   if (user) {
     const { count } = await supabase
       .from('boloes')
       .select('*', { count: 'exact', head: true }) // head: true diz pro Supabase não baixar os dados, só contar as linhas!
       .eq('user_id', user.id)
-
     qtdBoloes = count || 0
+
+    const { data: pagData } = await supabase
+      .from('pagamentos_usuarios')
+      .select('valor_pago')
+      .eq('user_id', user.id)
+      .single()
+    valorPago = pagData?.valor_pago || 0
   }
+  const valorTotal = qtdBoloes * 30
+  const saldoDevedor = valorTotal - valorPago
+  
+  // Só considera pago se tiver pelo menos 1 bolão e não dever nada
+  const isPago = qtdBoloes > 0 && saldoDevedor <= 0
 
   // Proteção: Se não estiver logado, joga para a tela de login
   if (!user) {
@@ -76,7 +89,7 @@ export default async function DashboardPage() {
               Sair
             </button>
           </form>
-        </div>{/* Painel 2: Status do Pagamento */}
+        </div>
       </nav>
 
       {/* Header com Boas-Vindas */}
@@ -139,32 +152,72 @@ export default async function DashboardPage() {
         </div>
         */}
 
-        {/* Painel 2: Status do Pagamento */}
-        <div className="bg-white/[0.02] border border-emerald-600 rounded-3xl p-6 backdrop-blur-xl flex flex-col justify-between group transition-all">
+        {/* Painel 2: Status do Pagamento Dinâmico */}
+        <div className={`bg-white/[0.02] border rounded-3xl p-6 backdrop-blur-xl flex flex-col justify-between group transition-all duration-500 ${
+          isPago ? 'border-emerald-600/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'border-emerald-600'
+        }`}>
           <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-4">
-              <span>💳</span> Pagamento
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <span>💳</span> Pagamento
+              </h2>
+              
+              <div className="text-[10px] text-gray-400 bg-white/2 border border-white/10 px-3 py-1.5 rounded-lg">
+                Já pago: <span className="text-white font-bold ml-1 tracking-wider">{valorPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+              </div>
+            </div> 
             <p className="text-xs text-gray-400 leading-relaxed">
               Cada bolão tem o valor de R$30,00. Garanta já a sua participação!
             </p>
             
-            {/* Box Informativo de PIX */}
-            <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-4 mt-4 flex items-center justify-between">
+            {/* Box Informativo Inteligente */}
+            <div className={`rounded-2xl p-4 mt-4 flex items-center justify-between border transition-colors duration-500 ${
+              isPago 
+                ? 'bg-emerald-500/10 border-emerald-500/20' 
+                : 'bg-amber-500/5 border-amber-500/10'
+            }`}>
               <div>
-                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block">Total a pagar</span>
-                <span className="text-xl font-black text-white">R$ {30*qtdBoloes},00</span>
+                <span className={`text-[10px] font-bold uppercase tracking-widest block transition-colors ${
+                  isPago ? 'text-emerald-400' : 'text-amber-400'
+                }`}>
+                  {isPago ? 'Pagamento Concluído' : 'Total a pagar'}
+                </span>
+                
+                {/* Se estiver pendente, mostra a diferença a pagar (caso ele tenha pago parcial). Se pagou tudo, mostra o total. */}
+                <span className="text-xl font-black text-white">
+                  {isPago 
+                    ? valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                    : saldoDevedor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                  }
+                </span>
               </div>
-              <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full uppercase">Pendente</span>
+
+              <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase transition-colors ${
+                isPago 
+                  ? 'text-emerald-400 bg-emerald-500/10' 
+                  : 'text-amber-400 bg-amber-500/10'
+              }`}>
+                {isPago ? 'Pago' : 'Pendente'}
+              </span>
             </div>
           </div>
 
-          <Link href={`https://wa.me/5531983315182?text='${encodeURIComponent(`Olá, sou ${nomeUsuario}`)}!'`} className="w-full mt-6 py-3 px-4 bg-white/5 border border-white/10 hover:bg-white/10 text-amber-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors text-center">
-            Solicitar pagamento
-          </Link>
+          {/* Botão Condicional */}
+          {!isPago ? (
+            <Link 
+              href={`https://wa.me/5531983315182?text=${encodeURIComponent(`Olá! Sou ${nomeUsuario}. Gostaria de realizar o pagamento dos meus ${qtdBoloes} bolões. O saldo pendente é de R$ ${saldoDevedor.toFixed(2).replace('.', ',')}.`)}`} 
+              target="_blank"
+              className="w-full mt-6 py-3 px-4 bg-white/5 border border-white/10 hover:bg-white/10 text-amber-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors text-center"
+            >
+              Solicitar pagamento
+            </Link>
+          ) : (
+            <div className="w-full mt-6 py-3 px-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-xs uppercase tracking-wider rounded-xl text-center flex items-center justify-center gap-2">
+              <span>Todos os seus bolões estão válidos!</span>
+            </div>
+          )}
         </div>
-
-
+        
         {/* Painel 5: Regulamento (Componente de Cliente) */}
         <RegulamentoModal />
 
