@@ -55,7 +55,7 @@ export default async function DashboardPage() {
     .order('nome', { ascending: true })
     .limit(3000)
 
-  console.log(qtdBoloes)
+  //console.log(times)
 
 
   return (
