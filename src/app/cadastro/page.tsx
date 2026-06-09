@@ -1,25 +1,33 @@
+'use client'
 import { signup } from '../auth/actions'
+import { useTransition, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 
-export default async function CadastroPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>
-}) {
-  const resolvedParams = await searchParams
+function CadastroContent() {
+  // 1. Lemos os parâmetros da URL pelo hook do cliente em vez de usar 'await'
+  const searchParams = useSearchParams()
+  const errorMessage = searchParams.get('error')
+
+  // 2. Hook do React perfeito para criar "Loading" com Server Actions
+  const [isPending, startTransition] = useTransition()
+
+  // 3. Função que aciona a sua Action de forma protegida
+  const handleAction = (formData: FormData) => {
+    // startTransition liga o 'isPending' automaticamente até a Action terminar
+    startTransition(() => {
+      signup(formData)
+    })
+  }
 
   return (
-    // Removemos a tag 'style' daqui de cima!
     <div className="flex min-h-screen flex-col items-center justify-center p-4 relative overflow-hidden">
       
       <div 
         className="absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat scale-250 sm:scale-135 transform-gpu"
         style={{ backgroundImage: "url('/bg-wc-2026-2.svg')" }}
       ></div>
-
-      {/* (Opcional) Uma leve camada escura sobre a imagem para dar mais contraste ao formulário */}
-      {/*<div className="absolute inset-0 -z-10 bg-black/10"></div>*/}
       
       {/* Botão de Voltar */}
       <div className="absolute top-8 left-8 z-20">
@@ -28,7 +36,7 @@ export default async function CadastroPage({
         </Link>
       </div>
 
-      {/* CAIXA GLASSMORPHISM (Mais transparente e com desfoque) */}
+      {/* CAIXA GLASSMORPHISM */}
       <div className="w-[90vw] sm:w-full max-w-md p-10 bg-white/75 border border-white rounded-3xl  relative z-10 transform scale-[0.85] sm:scale-100 origin-center">
         
         {/* Cabeçalho do Cadastro */}
@@ -44,7 +52,8 @@ export default async function CadastroPage({
           </div>
         </div>
         
-        <form action={signup} noValidate className="flex flex-col gap-5">
+        {/* Formulário: Agora usando a nossa função handleAction */}
+        <form action={handleAction} noValidate className="flex flex-col gap-5">
           
           {/* Campo: Nome Completo */}
           <div>
@@ -92,21 +101,26 @@ export default async function CadastroPage({
           </div>
 
           {/* Exibição de Erros */}
-          {resolvedParams.error && (
+          {errorMessage && (
             <div className="p-4 bg-red-500/90 border border-red-500/100 text-white text-sm rounded-xl text-center font-bold backdrop-blur-md mt-1 shadow-lg">
-              {resolvedParams.error}
+              {errorMessage}
             </div>
           )}
 
           {/* Botões */}
           <div className="mt-3">
-            <button
-              type="submit"
-              className="w-full py-4 px-4 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white font-black uppercase tracking-wide rounded-xl transition-all shadow-[0_4px_15px_rgba(16,185,129,0.5)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.7)] transform hover:-translate-y-0.5"
+            <button 
+              type="submit" 
+              disabled={isPending}
+              className={`w-full py-3 px-4 font-bold text-sm uppercase tracking-wider rounded-xl transition-all ${
+                isPending 
+                  ? 'bg-emerald-500/50 text-white/50 cursor-not-allowed' 
+                  : 'bg-emerald-500 hover:bg-emerald-400 text-white'
+              }`}
             >
-              Confirmar Inscrição
+              {isPending ? 'Cadastrando...' : 'Confirma inscrição'}
             </button>
-            
+
             <div className="mt-5 text-center text-sm">
               <span className="text-gray-600 font-medium drop-shadow-lg">Já faz parte do bolão? </span>
               <Link
@@ -124,5 +138,14 @@ export default async function CadastroPage({
         <p>Este bolão destina-se exclusivamente à participação de amigos.</p>
       </div>
     </div>
+  )
+}
+
+export default function CadastroPage() {
+  return (
+    // O fallback pode ser uma tela de carregamento genérica ou vazia
+    <Suspense fallback={<div className="min-h-screen bg-black" />}>
+      <CadastroContent />
+    </Suspense>
   )
 }
