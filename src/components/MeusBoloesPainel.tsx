@@ -852,9 +852,7 @@ const handleAbrirBolao = (bolao: Bolao) => {
                                             value={pos} 
                                             disabled={isOcupada}
                                             className={`bg-gray-900 ${
-                                              isOcupada ? 'text-gray-700' : 
-                                              pos === 1 ? 'text-teal-400' : 
-                                              pos === 2 ? 'text-emerald-400' : 'text-white'
+                                              isOcupada ? 'text-gray-700' : 'text-white'
                                             }`}
                                           >
                                             {pos}º
@@ -936,22 +934,27 @@ const handleAbrirBolao = (bolao: Bolao) => {
                                         />
                                       )}
 
-                                      <select
+                                      <select 
                                         value={valueAtual}
                                         onChange={(e) => handleMataMataChange(fase.key, i, e.target.value)}
-                                        // A classe pl-8 ou pl-10 afasta o texto para a direita abrindo espaço para a bandeira!
-                                        className={`w-full bg-black/60 border border-white/10 rounded-lg text-white font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 focus:outline-none appearance-none cursor-pointer hover:bg-white/5 transition-all truncate ${timeSelecionado ? 'pl-8 sm:pl-10 text-left' : 'pl-2 text-center'}`}
+                                        className={`w-full bg-black/60 border border-white/10 rounded-lg text-white font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 focus:outline-none appearance-none cursor-pointer hover:bg-black/80 focus:bg-zinc-900 transition-all truncate [color-scheme:dark] ${timeSelecionado ? 'pl-8 sm:pl-10 text-left' : 'pl-2 text-center'}`}
                                       >
-                                        <option value="" className="text-gray-500">- Vaga {i + 1} -</option>
+                                        <option value="" className="text-gray-400 bg-zinc-900">- Vaga {i + 1} -</option>
+                                        
                                         {fase.opcoes.map(time => {
                                           const isOcupada = valuesOcupados.includes(time.id.toString()) && valueAtual !== time.id.toString()
                                           return (
-                                            <option key={time.id} value={time.id} disabled={isOcupada} className={isOcupada ? 'text-gray-700' : 'text-white'}>
+                                            <option 
+                                              key={time.id} 
+                                              value={time.id} 
+                                              disabled={isOcupada} 
+                                              className={isOcupada ? 'text-gray-600 bg-zinc-900' : 'text-white bg-zinc-900'}
+                                            >
                                               {time.nome}
                                             </option>
                                           )
                                         })}
-                                      </select>
+                                      </select> 
                                     </div>
                                   )
                                 })}
@@ -978,7 +981,7 @@ const handleAbrirBolao = (bolao: Bolao) => {
                                 <select
                                   value={state.campeao}
                                   onChange={(e) => handleMataMataChange('campeao', 0, e.target.value)}
-                                  className={`w-full bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 font-black text-sm py-3 pr-3 focus:border-amber-400 focus:outline-none appearance-none cursor-pointer truncate ${state.campeao ? 'pl-11 text-left' : 'pl-3 text-center'}`}
+                                  className={`w-full bg-black/60 border border-white/10 rounded-lg text-white font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 focus:outline-none appearance-none cursor-pointer hover:bg-black/80 focus:bg-zinc-900 transition-all truncate [color-scheme:dark] ${state.campeao ? 'pl-8 sm:pl-10 text-left' : 'pl-2 text-center'}`}
                                 >
                                   <option value="" className="text-gray-500">- Escolher Campeão -</option>
                                   {opcoesFinal.map(time => (
@@ -1001,7 +1004,7 @@ const handleAbrirBolao = (bolao: Bolao) => {
                                 <select
                                   value={state.vice}
                                   onChange={(e) => handleMataMataChange('vice', 0, e.target.value)}
-                                  className={`w-full bg-gray-500/10 border border-gray-500/30 rounded-xl text-gray-300 font-black text-sm py-3 pr-3 focus:border-gray-400 focus:outline-none appearance-none cursor-pointer truncate ${state.vice ? 'pl-11 text-left' : 'pl-3 text-center'}`}
+                                  className={`w-full bg-black/60 border border-white/10 rounded-lg text-white font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 focus:outline-none appearance-none cursor-pointer hover:bg-black/80 focus:bg-zinc-900 transition-all truncate [color-scheme:dark] ${state.vice ? 'pl-8 sm:pl-10 text-left' : 'pl-2 text-center'}`}
                                 >
                                   <option value="" className="text-gray-500">- Escolher Vice -</option>
                                   {opcoesFinal.map(time => (
