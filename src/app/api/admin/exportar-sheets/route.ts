@@ -2,16 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.NEXT_SECRET_SUPABASE_KEY
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error("Missing Supabase environment variables");
-}
-
 const supabaseAdmin = createClient(
-  supabaseUrl,
-  supabaseServiceKey
+  process.env.NEXT_PUBLIC_SUPABASE_URL!, 
+  process.env.NEXT_SECRET_SUPABASE_KEY!
 )
 
 async function buscarTodosOsRegistros(tabela: string, filtros?: (query: any) => any) {
@@ -34,7 +27,7 @@ async function buscarTodosOsRegistros(tabela: string, filtros?: (query: any) => 
     if (data && data.length > 0) {
       todosDados = todosDados.concat(data)
       if (data.length < 1000) {
-        carregando = false // Fim dos dados
+        carregando = false 
       } else {
         de += 1000
         ate += 1000
@@ -54,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // =========================================================================
-    // 1. BUSCA USUÁRIOS CONTORNANDO A PAGINAÇÃO DA AUTH (MÁX 1000 POR PÁGINA)
+    // 1. BUSCA USUÁRIOS CONTORNANDO A PAGINAÇÃO DA AUTH
     // =========================================================================
     let listaUsuariosAuth: any[] = []
     let paginaAuth = 1
@@ -91,7 +84,7 @@ export async function POST(req: NextRequest) {
     ] = await Promise.all([
       buscarTodosOsRegistros('boloes'),
       buscarTodosOsRegistros('palpites_jogos'),
-      buscarTodosOsRegistros('palpites_groups' in supabaseAdmin ? 'palpites_groups' : 'palpites_grupos'), // previne desvios de digitação
+      buscarTodosOsRegistros('palpites_groups' in supabaseAdmin ? 'palpites_groups' : 'palpites_grupos'), 
       buscarTodosOsRegistros('palpites_matamata'),
       buscarTodosOsRegistros('palpites_premios'),
       buscarTodosOsRegistros('times_copa'),
@@ -112,13 +105,59 @@ export async function POST(req: NextRequest) {
       u.user_metadata?.nome || u.user_metadata?.full_name || u.email || 'Usuário Anônimo'
     ]))
 
-    // Identifica e ordena partidas reais da 1ª fase
     const nomesTimesCopa = new Set(times?.map(t => t.nome) || [])
     const partidas1fReal = (partidas || [])
       .filter(p => nomesTimesCopa.has(p.time_casa) && nomesTimesCopa.has(p.time_fora))
-      .sort((a, b) => (a.fixture_id || a.id) - (b.fixture_id || b.id))
+      .sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime())
 
-    const timesIds = [...new Set(palpitesGrupos?.map(p => p.time_id))].sort()
+
+    // =========================================================================
+    // DICIONÁRIO OFICIAL DA FIFA: ORDENAÇÃO EXATA ESTABELECIDA (A1 ATÉ L4)
+    // =========================================================================
+    const ordemFifa = [
+      // GRUPO A
+      "México", "África do Sul", "Coreia do Sul", "Chéquia",
+      // GRUPO B
+      "Canadá", "Bósnia e Herzegovina", "Catar", "Suíça",
+      // GRUPO C
+      "Brasil", "Marrocos", "Haiti", "Escócia",
+      // GRUPO D
+      "Estados Unidos", "Paraguai", "Austrália", "Turquia",
+      // GRUPO E
+      "Alemanha", "Curaçao", "Costa do Marfim", "Equador",
+      // GRUPO F
+      "Holanda", "Japão", "Suécia", "Tunísia",
+      // GRUPO G
+      "Bélgica", "Egito", "Irã", "Nova Zelândia",
+      // GRUPO H
+      "Espanha", "Cabo Verde", "Arábia Saudita", "Uruguai",
+      // GRUPO I
+      "França", "Senegal", "Iraque", "Noruega",
+      // GRUPO J
+      "Argentina", "Argélia", "Áustria", "Jordânia",
+      // GRUPO K
+      "Portugal", "República Democrática do Congo", "Uzbequistão", "Colômbia",
+      // GRUPO L
+      "Inglaterra", "Croácia", "Gana", "Panamá"
+    ];
+
+    const mapaOrdemFifa = new Map(ordemFifa.map((nome, index) => [nome, index]));
+
+    // =========================================================================
+    // 4. ORDENAÇÃO DOS GRUPOS COM BASE NO DICIONÁRIO CORRIGIDO
+    // =========================================================================
+    const timesOrdenadosPorGrupo = [...(times || [])].sort((a, b) => {
+      const grupoA = a.grupo || ''
+      const grupoB = b.grupo || ''
+      
+      const compGrupo = grupoA.localeCompare(grupoB)
+      if (compGrupo !== 0) return compGrupo
+
+      const ordemA = mapaOrdemFifa.get(a.nome) ?? 999
+      const ordemB = mapaOrdemFifa.get(b.nome) ?? 999
+      
+      return ordemA - ordemB
+    })
 
     const fasesMataMata = [
       { key: 'r32', count: 32 },
@@ -128,7 +167,7 @@ export async function POST(req: NextRequest) {
     ]
 
     // =========================================================================
-    // 4. MONTAGEM DOS CABEÇALHOS
+    // 5. MONTAGEM DOS CABEÇALHOS
     // =========================================================================
     const headerRow = ['Participante', 'Nome do Bolão']
 
@@ -137,9 +176,8 @@ export async function POST(req: NextRequest) {
       headerRow.push(`${textoConfronto} (Casa)`, `${textoConfronto} (Fora)`)
     })
 
-    timesIds.forEach(tId => {
-      const nomeTime = mapaTimes.get(tId.toString()) || `Time ${tId}`
-      headerRow.push(`Grupo: ${nomeTime}`)
+    timesOrdenadosPorGrupo.forEach(time => {
+      headerRow.push(`Grupo: ${time.nome}`)
     })
 
     fasesMataMata.forEach(fase => {
@@ -151,7 +189,7 @@ export async function POST(req: NextRequest) {
     headerRow.push('Prêmio: Bola de Ouro', 'Prêmio: Chuteira de Ouro', 'Prêmio: Luva de Ouro')
 
     // =========================================================================
-    // 5. PROCESSAMENTO DAS LINHAS
+    // 6. PROCESSAMENTO DAS LINHAS
     // =========================================================================
     const rows: any[][] = [headerRow]
 
@@ -162,7 +200,6 @@ export async function POST(req: NextRequest) {
       rowData.push(nomeDoParticipante)
       rowData.push(bolao.nome)
 
-      // Varre as partidas buscando o palpite correspondente (checa tanto por fixture_id quanto por id interno)
       partidas1fReal.forEach(jogo => {
         const palpite = palpitesJogos?.find(p => 
           p.bolao_id === bolao.id && 
@@ -172,8 +209,8 @@ export async function POST(req: NextRequest) {
         rowData.push(palpite ? palpite.gols_fora : '')
       })
 
-      timesIds.forEach(tId => {
-        const palpite = palpitesGrupos?.find(p => p.bolao_id === bolao.id && p.time_id === tId)
+      timesOrdenadosPorGrupo.forEach(time => {
+        const palpite = palpitesGrupos?.find(p => p.bolao_id === bolao.id && p.time_id === time.id)
         rowData.push(palpite ? `${palpite.posicao}º` : '')
       })
 
@@ -203,7 +240,7 @@ export async function POST(req: NextRequest) {
     })
 
     // =========================================================================
-    // 6. ENVIO PARA O GOOGLE SHEETS
+    // 7. ENVIO PARA O GOOGLE SHEETS
     // =========================================================================
     const auth = new google.auth.GoogleAuth({
       credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY!),
@@ -219,7 +256,7 @@ export async function POST(req: NextRequest) {
       requestBody: { values: rows },
     })
 
-    return NextResponse.json({ success: true, message: 'Planilha nominal gerada com sucesso!' })
+    return NextResponse.json({ success: true, message: 'Planilha nominal organizada cronologicamente por jogos e grupos gerada!' })
 
   } catch (err: any) {
     console.error("Erro no export", err)
