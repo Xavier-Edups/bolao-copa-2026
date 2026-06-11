@@ -1001,7 +1001,7 @@ const handleAbrirBolao = (bolao: Bolao) => {
                 const opcoesFinal = times.filter(t => Object.values(state.sf).includes(t.id.toString()))
 
                 const blocosMataMata: Array<{ key: 'r32' | 'r16' | 'qf' | 'sf', label: string, count: number, opcoes: TimeCopa[] }> = [
-                  { key: 'r32', label: 'Eliminatórios (32 Seleções)', count: 32, opcoes: times },
+                  { key: 'r32', label: 'Eliminatórias (32 Seleções)', count: 32, opcoes: times },
                   { key: 'r16', label: 'Oitavas de Final (16 Seleções)', count: 16, opcoes: opcoesR16 },
                   { key: 'qf', label: 'Quartas de Final (8 Seleções)', count: 8, opcoes: opcoesQf },
                   { key: 'sf', label: 'Semifinais (4 Seleções)', count: 4, opcoes: opcoesSf },
