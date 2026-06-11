@@ -38,6 +38,7 @@ interface Jogador {
 export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jogadores, username }: { partidas1f: Partida[], partidas2f: Partida[], times: TimeCopa[], jogadores: Jogador[], username: string }) {
   const router = useRouter()
   const supabase = createClient()
+  const [isInscricoesEncerradas, setIsInscricoesEncerradas] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [boloes, setBoloes] = useState<Bolao[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -60,9 +61,26 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
     luvaDeOuro: { timeId: string, jogador: string };
   }>>({})
 
-  // =======================================================================
-  // EFEITO DE CARREGAMENTO: Puxa os dados da nuvem ao abrir a página
-  // =======================================================================
+  useEffect(() => {
+    const DATA_LIMITE = new Date('2026-06-11T04:42:00-03:00')
+    
+    const checarPrazo = () => {
+      if (new Date() >= DATA_LIMITE) {
+        setIsInscricoesEncerradas(true)
+      }
+    }
+
+    checarPrazo()
+    const interval = setInterval(checarPrazo, 1000)
+    
+    // O return (cleanup) SEMPRE deve ser a última instrução de um useEffect
+    return () => clearInterval(interval)
+  }, []) // Array vazio: roda apenas 1 vez quando a tela abre
+
+
+  // =========================================================
+  // EFFECT 2: Carregamento dos Dados do Supabase
+  // =========================================================
   useEffect(() => {
     const carregarDadosSalvos = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -76,13 +94,6 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
           setBoloes(boloesDB)
         }
         
-        // DICA: Se você tem um estado (useState) que guarda a lista dos bolões criados 
-        // para renderizar na tela inicial, você deve atualizá-lo aqui. 
-        // Exemplo: se for `const [meusBoloes, setMeusBoloes] = useState([])`
-        // Descomente e use: setMeusBoloes(boloesDB || [])
-
-        // 2. Busca todos os palpites desse usuário de uma vez só!
-        // Como o RLS está ativado, o Supabase magicamente só vai trazer os dados dele.
         const [resJogos, resGrupos, resMata, resPremios] = await Promise.all([
           supabase.from('palpites_jogos').select('*'),
           supabase.from('palpites_grupos').select('*'),
@@ -90,7 +101,6 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
           supabase.from('palpites_premios').select('*')
         ])
 
-        // 3. RECONSTRUINDO AS MEMÓRIAS DO REACT DE TRÁS PRA FRENTE
         // A) Jogos 
         const rec1aFase: Record<string, Record<string, { casa: string, fora: string }>> = {}
         const rec2aFase: Record<string, Record<string, { casa: string, fora: string }>> = {}
@@ -618,30 +628,37 @@ const handleAbrirBolao = (bolao: Bolao) => {
                         <span className="text-[10px] sm:text-xs">⚠️</span> Faltam Palpites
                       </span>
                     )}
-
-                    <button
-                      onClick={() => handleExcluirBolao(bolao.id)}
-                      title="Excluir"
-                      className="p-1.5 sm:p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
-                    >
-                      {/* Ícone de Lixeira (com tamanho dinâmico também) */}
-                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    
+                    {isInscricoesEncerradas ? (
+                      <></>
+                    ) : (
+                      <button
+                        onClick={() => handleExcluirBolao(bolao.id)}
+                        title="Excluir"
+                        className="p-1.5 sm:p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                      >
+                        {/* Ícone de Lixeira (com tamanho dinâmico também) */}
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               )
             })} 
             </div>
         </div>
-
-        <button 
-          onClick={handleCriarBolao}
-          className="w-full sm:w-auto self-end mt-4 py-3 px-6 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-black uppercase text-xs tracking-wider rounded-xl transition-all shadow-md transform hover:-translate-y-0.5"
-        >
-          + Criar Novo Bolão
-        </button>
+        {isInscricoesEncerradas ? (
+          <></>
+        ) : (
+          <button 
+            onClick={handleCriarBolao}
+            className="w-full sm:w-auto self-end mt-4 py-3 px-6 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-black uppercase text-xs tracking-wider rounded-xl transition-all shadow-md transform hover:-translate-y-0.5"
+          >
+            + Criar Novo Bolão
+          </button>
+        )}
       </div>
 
       {/* MODAL DE PALPITES (Mantido igualzinho) */}
