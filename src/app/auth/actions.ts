@@ -29,7 +29,7 @@ export async function login(formData: FormData) {
 }
 
 export async function signup(formData: FormData) {
-  const DATA_LIMITE = new Date('2026-06-11T14:00:00-03:00');
+  const DATA_LIMITE = new Date('2026-06-11T16:00:00-03:00');
   console.log(new Date(), DATA_LIMITE)
 
   if (new Date() >= DATA_LIMITE) {

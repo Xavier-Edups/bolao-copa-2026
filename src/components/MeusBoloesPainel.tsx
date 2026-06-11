@@ -62,7 +62,7 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
   }>>({})
 
   useEffect(() => {
-    const DATA_LIMITE = new Date('2026-06-11T14:00:00-03:00')
+    const DATA_LIMITE = new Date('2026-06-11T16:00:00-03:00')
     
     const checarPrazo = () => {
       if (new Date() >= DATA_LIMITE) {
