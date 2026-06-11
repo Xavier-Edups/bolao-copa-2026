@@ -18,7 +18,7 @@ function CadastroContent() {
 
   useEffect(() => {
     // Prazo final configurado para 11 de Junho de 2026 às 16:00 (Horário de Brasília)
-    const DATA_LIMITE = new Date('2026-06-11T14:00:00-03:00')
+    const DATA_LIMITE = new Date('2026-06-11T16:00:00-03:00')
     
     const verificarCronometro = () => {
       if (new Date() >= DATA_LIMITE) {
