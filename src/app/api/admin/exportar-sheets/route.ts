@@ -14,6 +14,38 @@ const supabaseAdmin = createClient(
   supabaseServiceKey
 )
 
+async function buscarTodosOsRegistros(tabela: string, filtros?: (query: any) => any) {
+  let todosDados: any[] = []
+  let de = 0
+  let ate = 999
+  let carregando = true
+
+  while (carregando) {
+    let query = supabaseAdmin.from(tabela).select('*').range(de, ate)
+    
+    if (filtros) {
+      query = filtros(query)
+    }
+
+    const { data, error } = await query
+
+    if (error) throw error
+
+    if (data && data.length > 0) {
+      todosDados = todosDados.concat(data)
+      if (data.length < 1000) {
+        carregando = false // Fim dos dados
+      } else {
+        de += 1000
+        ate += 1000
+      }
+    } else {
+      carregando = false
+    }
+  }
+  return todosDados
+}
+
 export async function POST(req: NextRequest) {
   const secretHeader = req.headers.get('x-admin-secret')
   if (secretHeader !== process.env.ADMIN_SECRET) {
@@ -22,47 +54,65 @@ export async function POST(req: NextRequest) {
 
   try {
     // =========================================================================
-    // 1. BUSCA TODOS OS DADOS EM PARALELO (SEM FILTROS QUE QUEBREM A CONSULTA)
+    // 1. BUSCA USUÁRIOS CONTORNANDO A PAGINAÇÃO DA AUTH (MÁX 1000 POR PÁGINA)
+    // =========================================================================
+    let listaUsuariosAuth: any[] = []
+    let paginaAuth = 1
+    let temMaisUsuarios = true
+
+    while (temMaisUsuarios) {
+      const { data: resAuth, error: errorAuth } = await supabaseAdmin.auth.admin.listUsers({
+        page: paginaAuth,
+        perPage: 1000
+      })
+      if (errorAuth) throw errorAuth
+
+      if (resAuth && resAuth.users && resAuth.users.length > 0) {
+        listaUsuariosAuth = listaUsuariosAuth.concat(resAuth.users)
+        if (resAuth.users.length < 1000) temMaisUsuarios = false
+        else paginaAuth++
+      } else {
+        temMaisUsuarios = false
+      }
+    }
+
+    // =========================================================================
+    // 2. BUSCA AS TABELAS DO BANCO DE DADOS EM LOTES SEGUROS
     // =========================================================================
     const [
-      { data: boloes, error: errorBoloes },
-      { data: palpitesJogos, error: errorJogos },
-      { data: palpitesGrupos },
-      { data: palpitesMataMata },
-      { data: palpitesPremios },
-      { data: times },
-      { data: partidas },    
-      { data: jogadores },   
-      resUsuarios            
+      boloes,
+      palpitesJogos,
+      palpitesGrupos,
+      palpitesMataMata,
+      palpitesPremios,
+      times,
+      partidas,
+      jogadores
     ] = await Promise.all([
-      supabaseAdmin.from('boloes').select('id, user_id, nome'),
-      supabaseAdmin.from('palpites_jogos').select('*'), // CORREÇÃO: Removido o filtro .eq() que esvaziava a consulta
-      supabaseAdmin.from('palpites_grupos').select('*'),
-      supabaseAdmin.from('palpites_matamata').select('*'),
-      supabaseAdmin.from('palpites_premios').select('*'),
-      supabaseAdmin.from('times_copa').select('id, nome, grupo'),
-      supabaseAdmin.from('partidas').select('id, fixture_id, time_casa, time_fora'),
-      supabaseAdmin.from('jogadores').select('id, nome'),
-      supabaseAdmin.auth.admin.listUsers() 
+      buscarTodosOsRegistros('boloes'),
+      buscarTodosOsRegistros('palpites_jogos'),
+      buscarTodosOsRegistros('palpites_groups' in supabaseAdmin ? 'palpites_groups' : 'palpites_grupos'), // previne desvios de digitação
+      buscarTodosOsRegistros('palpites_matamata'),
+      buscarTodosOsRegistros('palpites_premios'),
+      buscarTodosOsRegistros('times_copa'),
+      buscarTodosOsRegistros('partidas'),
+      buscarTodosOsRegistros('jogadores')
     ])
 
-    if (errorBoloes) throw new Error(errorBoloes.message)
-    if (errorJogos) throw new Error(errorJogos.message)
     if (!boloes || boloes.length === 0) throw new Error("Nenhum bolão encontrado no banco.")
 
     // =========================================================================
-    // 2. CONSTRUÇÃO DOS DICIONÁRIOS DE TRADUÇÃO (MAPS)
+    // 3. CONSTRUÇÃO DOS DICIONÁRIOS DE TRADUÇÃO (MAPS)
     // =========================================================================
     const mapaTimes = new Map(times?.map(t => [t.id.toString(), t.nome]))
+    const mapaJogadores = new Map(jogadores?.map(j => [j.id.toString(), j.nome]))
 
-    const mapaUsuarios = new Map(resUsuarios.data?.users?.map(u => [
+    const mapaUsuarios = new Map(listaUsuariosAuth.map(u => [
       u.id, 
       u.user_metadata?.nome || u.user_metadata?.full_name || u.email || 'Usuário Anônimo'
     ]))
 
-    const mapaJogadores = new Map(jogadores?.map(j => [j.id.toString(), j.nome]))
-
-    // CORREÇÃO: Identifica as partidas da 1ª fase cruzando com o nome das seleções oficiais da 'times_copa'
+    // Identifica e ordena partidas reais da 1ª fase
     const nomesTimesCopa = new Set(times?.map(t => t.nome) || [])
     const partidas1fReal = (partidas || [])
       .filter(p => nomesTimesCopa.has(p.time_casa) && nomesTimesCopa.has(p.time_fora))
@@ -78,11 +128,10 @@ export async function POST(req: NextRequest) {
     ]
 
     // =========================================================================
-    // 3. MONTAGEM DOS CABEÇALHOS COM NOMES AMIGÁVEIS
+    // 4. MONTAGEM DOS CABEÇALHOS
     // =========================================================================
     const headerRow = ['Participante', 'Nome do Bolão']
 
-    // Cria dinamicamente o par de colunas (Casa/Fora) para cada jogo mapeado da 1ª Fase
     partidas1fReal.forEach(jogo => {
       const textoConfronto = `${jogo.time_casa} x ${jogo.time_fora}`
       headerRow.push(`${textoConfronto} (Casa)`, `${textoConfronto} (Fora)`)
@@ -102,7 +151,7 @@ export async function POST(req: NextRequest) {
     headerRow.push('Prêmio: Bola de Ouro', 'Prêmio: Chuteira de Ouro', 'Prêmio: Luva de Ouro')
 
     // =========================================================================
-    // 4. PROCESSAMENTO E TRADUÇÃO DAS LINHAS DE DADOS
+    // 5. PROCESSAMENTO DAS LINHAS
     // =========================================================================
     const rows: any[][] = [headerRow]
 
@@ -113,9 +162,12 @@ export async function POST(req: NextRequest) {
       rowData.push(nomeDoParticipante)
       rowData.push(bolao.nome)
 
-      // CORREÇÃO: Varre as partidas mapeadas buscando os palpites pelo fixture_id correspondente
+      // Varre as partidas buscando o palpite correspondente (checa tanto por fixture_id quanto por id interno)
       partidas1fReal.forEach(jogo => {
-        const palpite = palpitesJogos?.find(p => p.bolao_id === bolao.id && p.partida_id === jogo.fixture_id)
+        const palpite = palpitesJogos?.find(p => 
+          p.bolao_id === bolao.id && 
+          (p.partida_id === jogo.fixture_id || p.partida_id?.toString() === jogo.id?.toString())
+        )
         rowData.push(palpite ? palpite.gols_casa : '')
         rowData.push(palpite ? palpite.gols_fora : '')
       })
@@ -151,7 +203,7 @@ export async function POST(req: NextRequest) {
     })
 
     // =========================================================================
-    // 5. ENVIO EM LOTE PARA O GOOGLE SHEETS
+    // 6. ENVIO PARA O GOOGLE SHEETS
     // =========================================================================
     const auth = new google.auth.GoogleAuth({
       credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY!),
