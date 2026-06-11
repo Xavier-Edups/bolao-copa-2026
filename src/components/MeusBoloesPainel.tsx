@@ -1,3 +1,4 @@
+
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
@@ -508,7 +509,66 @@ const handleAbrirBolao = (bolao: Bolao) => {
     return { diaMes, hora }
   }
 
-  return (
+  // =======================================================================
+  // VERIFICAÇÃO DE STATUS DO BOLÃO (100% PREENCHIDO OU PENDENTE)
+  // =======================================================================
+  const verificarBolaoCompleto = (bolaoId: string) => {
+    // Previne falsos positivos enquanto a tela ainda está carregando do banco
+    if (partidas1f.length === 0 || times.length === 0) return false
+
+    // Cria uma lista com os nomes oficiais dos países (ex: ['Brasil', 'Alemanha', ...])
+    const nomesDosPaises = times.map(t => t.nome)
+
+    // Filtra a 2ª Fase: O jogo SÓ é exigido se os dois times já forem países definidos
+    const partidas2fDefinidas = partidas2f.filter(p => 
+      nomesDosPaises.includes(p.time_casa) && nomesDosPaises.includes(p.time_fora)
+    )
+
+    // 1. Verifica Partidas (1ª Fase Inteira + 2ª Fase Definida)
+    const p1 = palpites1aFase[bolaoId] || {}
+    const p2 = palpites2aFase[bolaoId] || {}
+    
+    const totalPartidasExigidas = partidas1f.length + partidas2fDefinidas.length
+    let partidasPreenchidas = 0
+    
+    // Conta os palpites da 1ª Fase
+    partidas1f.forEach(p => {
+      const palpite = p1[p.id]
+      if (palpite && palpite.casa !== '' && palpite.fora !== '') partidasPreenchidas++
+    })
+
+    // Conta os palpites APENAS das partidas válidas da 2ª Fase
+    partidas2fDefinidas.forEach(p => {
+      const palpite = p2[p.id]
+      if (palpite && palpite.casa !== '' && palpite.fora !== '') partidasPreenchidas++
+    })
+
+    // Se a soma dos palpites preenchidos for menor que o exigido, barra a tag verde
+    if (partidasPreenchidas < totalPartidasExigidas) return false
+
+    // 2. Verifica Grupos (Todos os times devem ter posição)
+    const pGrupos = palpitesGrupos[bolaoId] || {}
+    const gruposPreenchidos = Object.values(pGrupos).filter(pos => pos !== '').length
+    if (gruposPreenchidos < times.length) return false
+
+    // 3. Verifica Mata-Mata (Funil completo)
+    const pMata = palpitesMataMata[bolaoId] || { r32: {}, r16: {}, qf: {}, sf: {}, campeao: '', vice: '' }
+    const r32Count = Object.values(pMata.r32 || {}).filter(v => v !== '').length
+    const r16Count = Object.values(pMata.r16 || {}).filter(v => v !== '').length
+    const qfCount = Object.values(pMata.qf || {}).filter(v => v !== '').length
+    const sfCount = Object.values(pMata.sf || {}).filter(v => v !== '').length
+    
+    if (r32Count < 32 || r16Count < 16 || qfCount < 8 || sfCount < 4 || !pMata.campeao || !pMata.vice) return false
+
+    // 4. Verifica Prêmios
+    const pPremios = palpitesPremios[bolaoId] || {}
+    if (!pPremios.bolaDeOuro?.jogador || !pPremios.chuteiraDeOuro?.jogador || !pPremios.luvaDeOuro?.jogador) return false
+
+    // Se o código sobreviveu a todos os 'return false' acima, a cartela está perfeita!
+    return true
+  }
+
+    return (
     <>
       <div className="bg-white/[0.02] border border-emerald-600 rounded-3xl p-6 backdrop-blur-xl md:col-span-2 flex flex-col justify-between group  transition-all">
         <div>
@@ -522,34 +582,57 @@ const handleAbrirBolao = (bolao: Bolao) => {
           </div>
             {/* Lista de Bolões Atualizada com Ícones */}
             <div className="grid gap-3 my-4 sm:grid-cols-2 min-h-[120px]">
-              {boloes.map((bolao) => (
+              {boloes.map((bolao) => {
+              const isCompleto = verificarBolaoCompleto(bolao.id)
+
+              return (
                 <div 
                   key={bolao.id} 
-                  className=" max-h-[60px] flex items-center justify-between p-2 pl-4 bg-white/5 border border-white/10 rounded-xl hover:bg-gradient-to-br from-teal-900/30 to-emerald-900/10 hover:border-teal-500/30 transition-all group/item"
+                  // 1. SEMPRE EM LINHA: flex-row e items-center alinham tudo ao centro verticalmente
+                  // 2. min-h-[60px] garante que o card sempre terá uma boa área de clique
+                  className="max-h-[60px] flex items-center justify-between p-2 sm:p-3 pl-3 sm:pl-4 bg-white/5 border border-white/10 rounded-xl hover:bg-gradient-to-br from-teal-900/30 to-emerald-900/10 hover:border-teal-500/30 transition-all group/item"
                 >
-                  {/* Área Clicável para abrir o bolão (Ocupa o máximo de espaço) */}
+                  {/* Área do Nome do Bolão */}
                   <button
                     onClick={() => handleAbrirBolao(bolao)}
-                    className="flex-1 text-left text-white font-bold flex flex-col justify-center outline-none"
+                    className="flex-1 text-left outline-none truncate mr-2"
                   >
-                    <span className="truncate text-emerald-400 hover:text-emerald-300 text-xl">{bolao.nome} ▸</span>
+                    {/* 3. FONTE DINÂMICA: Ajusta o tamanho baseado na tela, mas é IGUAL para todos os cards. 
+                           O truncate garante que nomes absurdamente gigantes não "esmaguem" a tag */}
+                    <span className="truncate text-emerald-400 hover:text-emerald-300 font-bold text-sm min-[400px]:text-base sm:text-lg md:text-xl transition-all">
+                      {bolao.nome} ▸
+                    </span>
                   </button>
 
-                  {/* Grupo de Ações (Excluir) */}
-                  <div className="flex items-center gap-1 ml-2">
+                  {/* Grupo de Ações (Tag + Lixeira) */}
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    
+                    {/* TAG DE STATUS VISUAL */}
+                    {isCompleto ? (
+                      // 4. whitespace-nowrap impede que o texto da tag quebre em duas linhas
+                      <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-[8px] min-[400px]:text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)] whitespace-nowrap">
+                        <span className="text-[10px] sm:text-xs">✓</span> Completo
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-[8px] min-[400px]:text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.1)] whitespace-nowrap">
+                        <span className="text-[10px] sm:text-xs">⚠️</span> Faltam Palpites
+                      </span>
+                    )}
+
                     <button
                       onClick={() => handleExcluirBolao(bolao.id)}
                       title="Excluir"
-                      className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                      className="p-1.5 sm:p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
                     >
-                      {/* Ícone de Lixeira (SVG) */}
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {/* Ícone de Lixeira (com tamanho dinâmico também) */}
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
                     </button>
                   </div>
                 </div>
-              ))}
+              )
+            })} 
             </div>
         </div>
 
