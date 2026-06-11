@@ -1,3 +1,4 @@
+
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
@@ -582,43 +583,49 @@ const handleAbrirBolao = (bolao: Bolao) => {
             {/* Lista de Bolões Atualizada com Ícones */}
             <div className="grid gap-3 my-4 sm:grid-cols-2 min-h-[120px]">
               {boloes.map((bolao) => {
-              // Executa o radar para saber o status deste bolão específico
               const isCompleto = verificarBolaoCompleto(bolao.id)
 
               return (
                 <div 
                   key={bolao.id} 
-                  className=" max-h-[60px] flex items-center justify-between p-2 pl-4 bg-white/5 border border-white/10 rounded-xl hover:bg-gradient-to-br from-teal-900/30 to-emerald-900/10 hover:border-teal-500/30 transition-all group/item"
+                  // 1. SEMPRE EM LINHA: flex-row e items-center alinham tudo ao centro verticalmente
+                  // 2. min-h-[60px] garante que o card sempre terá uma boa área de clique
+                  className="max-h-[60px] flex items-center justify-between p-2 sm:p-3 pl-3 sm:pl-4 bg-white/5 border border-white/10 rounded-xl hover:bg-gradient-to-br from-teal-900/30 to-emerald-900/10 hover:border-teal-500/30 transition-all group/item"
                 >
-                  {/* Área Clicável para abrir o bolão (Ocupa o máximo de espaço) */}
+                  {/* Área do Nome do Bolão */}
                   <button
                     onClick={() => handleAbrirBolao(bolao)}
-                    className="flex-1 text-left text-white font-bold flex flex-col justify-center outline-none truncate"
+                    className="flex-1 text-left outline-none truncate mr-2"
                   >
-                    <span className="truncate text-emerald-400 hover:text-emerald-300 text-xl">{bolao.nome} ▸</span>
+                    {/* 3. FONTE DINÂMICA: Ajusta o tamanho baseado na tela, mas é IGUAL para todos os cards. 
+                           O truncate garante que nomes absurdamente gigantes não "esmaguem" a tag */}
+                    <span className="truncate text-emerald-400 hover:text-emerald-300 font-bold text-sm min-[400px]:text-base sm:text-lg md:text-xl transition-all">
+                      {bolao.nome} ▸
+                    </span>
                   </button>
 
-                  {/* Grupo de Ações (Tag de Status + Botão Excluir) */}
-                  <div className="flex items-center gap-3 ml-2 shrink-0">
+                  {/* Grupo de Ações (Tag + Lixeira) */}
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                     
                     {/* TAG DE STATUS VISUAL */}
                     {isCompleto ? (
-                      <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
-                        <span className="text-xs">✓</span> Completo
+                      // 4. whitespace-nowrap impede que o texto da tag quebre em duas linhas
+                      <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-[8px] min-[400px]:text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)] whitespace-nowrap">
+                        <span className="text-[10px] sm:text-xs">✓</span> Completo
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.1)]">
-                        <span className="text-xs">⚠️</span> PALPITES PENDENTES
+                      <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-[8px] min-[400px]:text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.1)] whitespace-nowrap">
+                        <span className="text-[10px] sm:text-xs">⚠️</span> Faltam Palpites
                       </span>
                     )}
 
                     <button
                       onClick={() => handleExcluirBolao(bolao.id)}
                       title="Excluir"
-                      className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                      className="p-1.5 sm:p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
                     >
-                      {/* Ícone de Lixeira (SVG) */}
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {/* Ícone de Lixeira (com tamanho dinâmico também) */}
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
                     </button>
