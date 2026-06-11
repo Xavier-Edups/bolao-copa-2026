@@ -116,27 +116,27 @@ export async function POST(req: NextRequest) {
     // =========================================================================
     const ordemFifa = [
       // GRUPO A
-      "México", "África do Sul", "Coreia do Sul", "Chéquia",
+      "Tchéquia", "México", "África do Sul", "Coreia do Sul",
       // GRUPO B
-      "Canadá", "Bósnia e Herzegovina", "Catar", "Suíça",
+      "Bósnia e Herzegovina", "Canadá", "Catar", "Suíça",
       // GRUPO C
       "Brasil", "Marrocos", "Haiti", "Escócia",
       // GRUPO D
-      "Estados Unidos", "Paraguai", "Austrália", "Turquia",
+      "Turquia", "Estados Unidos", "Paraguai", "Austrália", 
       // GRUPO E
       "Alemanha", "Curaçao", "Costa do Marfim", "Equador",
       // GRUPO F
-      "Holanda", "Japão", "Suécia", "Tunísia",
+      "Suécia", "Holanda", "Japão", "Tunísia",
       // GRUPO G
       "Bélgica", "Egito", "Irã", "Nova Zelândia",
       // GRUPO H
       "Espanha", "Cabo Verde", "Arábia Saudita", "Uruguai",
       // GRUPO I
-      "França", "Senegal", "Iraque", "Noruega",
+      "Iraque", "França", "Senegal", "Noruega",
       // GRUPO J
       "Argentina", "Argélia", "Áustria", "Jordânia",
       // GRUPO K
-      "Portugal", "República Democrática do Congo", "Uzbequistão", "Colômbia",
+      "República Democrática do Congo", "Portugal", "Uzbequistão", "Colômbia",
       // GRUPO L
       "Inglaterra", "Croácia", "Gana", "Panamá"
     ];
