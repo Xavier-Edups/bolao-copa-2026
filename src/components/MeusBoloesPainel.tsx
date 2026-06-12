@@ -38,7 +38,7 @@ interface Jogador {
   posicao: string
 }
 
-export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jogadores, username }: { partidas1f: Partida[], partidas2f: Partida[], times: TimeCopa[], jogadores: Jogador[], username: string }) {
+export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jogadores, username, listaRanking }: { partidas1f: Partida[], partidas2f: Partida[], times: TimeCopa[], jogadores: Jogador[], username: string, listaRanking: any[] }) {
   const router = useRouter()
   const supabase = createClient()
   const [isInscricoesEncerradas, setIsInscricoesEncerradas] = useState(false)
@@ -84,24 +84,35 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
   // =========================================================
   // EFFECT 2: Carregamento dos Dados do Supabase
   // =========================================================
+
   useEffect(() => {
     const carregarDadosSalvos = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return // Se não estiver logado, não faz nada
 
       try {
-        // 1. Busca os Bolões do usuário
-        const { data: boloesDB } = await supabase.from('boloes').select('*')
+        // 1. Busca APENAS os Bolões do usuário logado
+        const { data: boloesDB } = await supabase
+          .from('boloes')
+          .select('*')
+          .eq('user_id', user.id) // <-- O FILTRO SALVADOR AQUI
 
         if (boloesDB) {
           setBoloes(boloesDB)
         }
         
+        // Se o usuário ainda não tem bolões, podemos encerrar a busca aqui e poupar o banco
+        if (!boloesDB || boloesDB.length === 0) return
+
+        // Extrai a lista de IDs dos bolões para filtrar as tabelas pesadas de palpites
+        const meusBoloesIds = boloesDB.map(b => b.id)
+
+        // 2. Busca apenas os palpites atrelados aos bolões deste usuário
         const [resJogos, resGrupos, resMata, resPremios] = await Promise.all([
-          supabase.from('palpites_jogos').select('*'),
-          supabase.from('palpites_grupos').select('*'),
-          supabase.from('palpites_matamata').select('*'),
-          supabase.from('palpites_premios').select('*')
+          supabase.from('palpites_jogos').select('*').in('bolao_id', meusBoloesIds),
+          supabase.from('palpites_grupos').select('*').in('bolao_id', meusBoloesIds),
+          supabase.from('palpites_matamata').select('*').in('bolao_id', meusBoloesIds),
+          supabase.from('palpites_premios').select('*').in('bolao_id', meusBoloesIds)
         ])
 
         // A) Jogos 
@@ -169,9 +180,9 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
     }
 
     carregarDadosSalvos()
-  }, [partidas1f, jogadores]) // Se as props de base mudarem, ele recalcula
+  }, [partidas1f, jogadores])
 
-  const handleSalvarBolao = async () => {
+    const handleSalvarBolao = async () => {
     if (!bolaoAtivo) return
     setIsSaving(true)
 
@@ -674,23 +685,41 @@ const handleAbrirBolao = (bolao: Bolao) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/90 backdrop-blur-sm">
           <div className="bg-[#0a0a0a] border-0 sm:border border-white/10 w-full sm:max-w-4xl h-full sm:h-[85vh] flex flex-col justify-between sm:rounded-3xl shadow-2xl relative overflow-hidden">
             
-            <div className="p-4 sm:p-6 border-b border-white/5 flex justify-between items-center bg-black/40 backdrop-blur-md">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-[0.2em] text-teal-400">Cartela de Palpites</span>
+            {/* CABEÇALHO DO MODAL (Corrigido para Mobile) */}
+            <div className="p-4 sm:p-6 border-b border-white/5 flex justify-between items-start bg-black/40 backdrop-blur-md">
+              
+              {/* Coluna da Esquerda (Textos e Tags com espaço flexível) */}
+              <div className="flex-1 min-w-0 pr-3 sm:pr-4">
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] text-teal-400 block mb-1">
+                  Cartela de Palpites
+                </span>
                 
-                {/* MUDANÇA 1: Cabeçalho com a Tag de Pontuação Total */}
-                <h3 className="text-lg sm:text-xl font-black text-white uppercase mt-0.5 flex flex-wrap items-center gap-2 sm:gap-3">
-                  <span className="truncate max-w-[200px] sm:max-w-none">{username} / {bolaoAtivo.nome}</span>
-                  <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-400 px-2.5 py-0.5 rounded-lg text-xs sm:text-sm font-black tracking-wide flex items-center gap-1.5 shadow-[0_0_10px_rgba(245,158,11,0.1)]">
-                    🏆 {bolaoAtivo.pontuacao_total || 0} pts
-                  </div>
+                {/* NOME COMPLETO: Sem truncate, quebra linha naturalmente */}
+                <h3 className="text-base sm:text-xl font-black text-white uppercase leading-tight break-words">
+                  {username} <span className="text-gray-500 font-bold text-sm sm:text-lg">/ {bolaoAtivo.nome}</span>
                 </h3>
 
+                {/* CONTAINER DAS TAGS: Empilhadas embaixo no mobile, lado a lado com wrap */}
+                <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-3">
+                  
+                  {/* TAG DE PONTOS */}
+                  <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-400 px-2.5 py-1 sm:py-0.5 rounded-lg text-xs sm:text-sm font-black tracking-wide flex items-center gap-1.5 shadow-[0_0_10px_rgba(245,158,11,0.1)]">
+                    🏆 {bolaoAtivo.pontuacao_total || 0} pts
+                  </div>
+                  
+                  {/* TAG DE POSIÇÃO */}
+                  <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 text-emerald-400 px-2.5 py-1 sm:py-0.5 rounded-lg text-xs sm:text-sm font-black tracking-wide flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                    🏅 {listaRanking?.find(r => String(r.id) === String(bolaoAtivo.id))?.posicaoReal || '-'}º Lugar
+                  </div>
+
+                </div>
               </div> 
+
+              {/* Botão Fechar/Salvar (Ancorado à direita, não encolhe) */}
               <button 
                 onClick={isInscricoesEncerradas ? handleFecharBolao : handleSalvarBolao}
                 disabled={isSaving}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border border-white/10 ${
+                className={`shrink-0 px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all border border-white/10 ${
                   isSaving 
                     ? 'bg-teal-500 text-white cursor-wait opacity-80' 
                     : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white'
@@ -702,10 +731,10 @@ const handleAbrirBolao = (bolao: Bolao) => {
                   Salvando...
                 </span>
               ) : (
-                isInscricoesEncerradas ? 'Fechar' : 'Salvar e Fechar'
+                isInscricoesEncerradas ? 'Fechar' : 'Salvar'
               )} 
               </button>
-            </div>
+            </div> 
 
             <div className="flex-1 overflow-y-auto p-0 text-gray-400">
               
