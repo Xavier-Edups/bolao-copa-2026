@@ -11,9 +11,8 @@ const publicUrl = process.env.NEXT_PUBLIC_APP_URL!
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function GET(req: NextRequest) {
-  // Proteção nativa da Vercel para garantir que apenas o Cron do sistema chame esta rota
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  const secretHeader = req.headers.get('x-admin-secret')
+  if (secretHeader !== process.env.ADMIN_SECRET) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
