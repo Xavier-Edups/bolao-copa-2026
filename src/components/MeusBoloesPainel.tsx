@@ -41,6 +41,7 @@ interface Jogador {
 export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jogadores, username, listaRanking }: { partidas1f: Partida[], partidas2f: Partida[], times: TimeCopa[], jogadores: Jogador[], username: string, listaRanking: any[] }) {
   const router = useRouter()
   const supabase = createClient()
+  const [isLoading, setIsLoading] = useState(true)
   const [isInscricoesEncerradas, setIsInscricoesEncerradas] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [boloes, setBoloes] = useState<Bolao[]>([])
@@ -88,7 +89,11 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
   useEffect(() => {
     const carregarDadosSalvos = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return // Se não estiver logado, não faz nada
+      
+      if (!user) {
+        setIsLoading(false) // Desliga se não estiver logado
+        return 
+      }
 
       try {
         // 1. Busca APENAS os Bolões do usuário logado
@@ -102,7 +107,9 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
         }
         
         // Se o usuário ainda não tem bolões, podemos encerrar a busca aqui e poupar o banco
-        if (!boloesDB || boloesDB.length === 0) return
+        if (!boloesDB || boloesDB.length === 0) {
+          return // O bloco 'finally' vai rodar e desligar o loading mesmo com esse return!
+        }
 
         // Extrai a lista de IDs dos bolões para filtrar as tabelas pesadas de palpites
         const meusBoloesIds = boloesDB.map(b => b.id)
@@ -176,12 +183,14 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
 
       } catch (error) {
         console.error("Erro ao carregar dados salvos da nuvem:", error)
+      } finally {
+        setIsLoading(false) // <-- DESLIGA A ANIMAÇÃO DE LOADING AQUI, INDEPENDENTE DE SUCESSO OU ERRO
       }
     }
 
     carregarDadosSalvos()
   }, [partidas1f, jogadores])
-
+  
     const handleSalvarBolao = async () => {
     if (!bolaoAtivo) return
     setIsSaving(true)
@@ -597,9 +606,9 @@ const handleAbrirBolao = (bolao: Bolao) => {
     return true
   }
 
-    return (
+  return (
     <>
-      <div className="bg-white/[0.02] border border-emerald-600 rounded-3xl p-6 backdrop-blur-xl md:col-span-2 flex flex-col justify-between group  transition-all">
+      <div className="bg-white/[0.02] border border-emerald-600 rounded-3xl p-6 backdrop-blur-xl md:col-span-2 flex flex-col justify-between group transition-all">
         <div>
           <div className="flex justify-between items-start mb-4">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -609,66 +618,90 @@ const handleAbrirBolao = (bolao: Bolao) => {
               {boloes.length} Ativos
             </span>
           </div>
-            {/* Lista de Bolões Atualizada com Ícones */}
-            <div className="grid gap-3 my-4 sm:grid-cols-2 min-h-[120px]">
-              {boloes.map((bolao) => {
-              const isCompleto = verificarBolaoCompleto(bolao.id)
 
-              return (
-                <div 
-                  key={bolao.id} 
-                  // 1. SEMPRE EM LINHA: flex-row e items-center alinham tudo ao centro verticalmente
-                  // 2. min-h-[60px] garante que o card sempre terá uma boa área de clique
-                  className="max-h-[60px] flex items-center justify-between p-2 sm:p-3 pl-3 sm:pl-4 bg-white/5 border border-white/10 rounded-xl hover:bg-gradient-to-br from-teal-900/30 to-emerald-900/10 hover:border-teal-500/30 transition-all group/item"
-                >
-                  {/* Área do Nome do Bolão */}
-                  <button
-                    onClick={() => handleAbrirBolao(bolao)}
-                    className="flex-1 text-left outline-none truncate mr-2"
-                  >
-                    {/* 3. FONTE DINÂMICA: Ajusta o tamanho baseado na tela, mas é IGUAL para todos os cards. 
-                           O truncate garante que nomes absurdamente gigantes não "esmaguem" a tag */}
-                    <span className="truncate text-emerald-400 hover:text-emerald-300 font-bold text-sm min-[400px]:text-base sm:text-lg md:text-xl transition-all">
-                      {bolao.nome} ▸
-                    </span>
-                  </button>
-
-                  {/* Grupo de Ações (Tag + Lixeira) */}
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                    
-                    {/* TAG DE STATUS VISUAL */}
-                    {isCompleto ? (
-                      // 4. whitespace-nowrap impede que o texto da tag quebre em duas linhas
-                      <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-[8px] min-[400px]:text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)] whitespace-nowrap">
-                        <span className="text-[10px] sm:text-xs">✓</span> Completo
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-[8px] min-[400px]:text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.1)] whitespace-nowrap">
-                        <span className="text-[10px] sm:text-xs">⚠️</span> Faltam Palpites
-                      </span>
-                    )}
-                    
-                    {isInscricoesEncerradas ? (
-                      <></>
-                    ) : (
-                      <button
-                        onClick={() => handleExcluirBolao(bolao.id)}
-                        title="Excluir"
-                        className="p-1.5 sm:p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
-                      >
-                        {/* Ícone de Lixeira (com tamanho dinâmico também) */}
-                        <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
+          <div className="grid gap-3 my-4 sm:grid-cols-2 min-h-[120px]">
+            {isLoading ? (
+              // -----------------------------------
+              // ANIMAÇÃO DE LOADING (Spinner Premium)
+              // -----------------------------------
+              // col-span-1 sm:col-span-2 faz o loading ocupar a tela toda, não só meia coluna
+              <div className="col-span-1 sm:col-span-2 flex flex-col items-center justify-center py-12 space-y-4 bg-black/20 rounded-2xl border border-white/5">
+                <div className="relative flex justify-center items-center">
+                  <div className="w-10 h-10 border-4 border-teal-500/20 rounded-full absolute"></div>
+                  <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
-              )
-            })} 
-            </div>
+                <span className="text-xs font-black text-teal-400/70 uppercase tracking-widest animate-pulse">
+                  Sincronizando Dados...
+                </span>
+              </div>
+            ) : (
+              // -----------------------------------
+              // LISTA DE BOLÕES CARREGADA
+              // -----------------------------------
+              <>
+                {/* O MAP entra AQUI, depois de confirmar que já carregou */}
+                {boloes.map((bolao) => {
+                  const isCompleto = verificarBolaoCompleto(bolao.id)
+
+                  return (
+                    <div 
+                      key={bolao.id} 
+                      className="max-h-[60px] flex items-center justify-between p-2 sm:p-3 pl-3 sm:pl-4 bg-white/5 border border-white/10 rounded-xl hover:bg-gradient-to-br from-teal-900/30 to-emerald-900/10 hover:border-teal-500/30 transition-all group/item"
+                    >
+                      {/* Área do Nome do Bolão */}
+                      <button
+                        onClick={() => handleAbrirBolao(bolao)}
+                        className="flex-1 text-left outline-none truncate mr-2"
+                      >
+                        <span className="truncate text-emerald-400 hover:text-emerald-300 font-bold text-sm min-[400px]:text-base sm:text-lg md:text-xl transition-all">
+                          {bolao.nome} ▸
+                        </span>
+                      </button>
+
+                      {/* Grupo de Ações (Tag + Lixeira) */}
+                      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                        {/* TAG DE STATUS VISUAL */}
+                        {isCompleto ? (
+                          <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-[8px] min-[400px]:text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)] whitespace-nowrap">
+                            <span className="text-[10px] sm:text-xs">✓</span> Completo
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-[8px] min-[400px]:text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.1)] whitespace-nowrap">
+                            <span className="text-[10px] sm:text-xs">⚠️</span> Faltam Palpites
+                          </span>
+                        )}
+                        
+                        {isInscricoesEncerradas ? (
+                          <></>
+                        ) : (
+                          <button
+                            onClick={() => handleExcluirBolao(bolao.id)}
+                            title="Excluir"
+                            className="p-1.5 sm:p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                          >
+                            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Mensagem caso não tenha bolões - Ocupa as duas colunas do grid */}
+                {boloes.length === 0 && (
+                  <div className="col-span-1 sm:col-span-2 text-center text-sm text-gray-500 py-6">
+                    Você ainda não tem nenhum bolão.
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
-        {isInscricoesEncerradas ? (
+
+        {/* BOTÃO CRIAR BOLÃO (Renderizado fora da lista) */}
+        {isInscricoesEncerradas || isLoading ? (
           <></>
         ) : (
           <button 
