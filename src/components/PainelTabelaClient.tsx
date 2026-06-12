@@ -8,6 +8,7 @@ interface JogadorRanking {
   nomeUsuario: string
   nomeBolao: string
   pontuacao_total: number
+  posicaoReal: number // O Front-end agora EXIGE essa variável
 }
 
 interface PainelTabelaClientProps {
@@ -18,26 +19,12 @@ interface PainelTabelaClientProps {
 export default function PainelTabelaClient({ listaRanking, bolaoAtivoId }: PainelTabelaClientProps) {
   const [isModalTabelaOpen, setIsModalTabelaOpen] = useState(false)
 
-  // ==========================================
-  // LÓGICA DE EMPATE (DENSE RANKING)
-  // ==========================================
-  let posicaoAtual = 1;
-  let ultimaPontuacao = listaRanking?.[0]?.pontuacao_total ?? -1;
-
-  const rankingComPosicao = listaRanking?.map((jogador) => {
-    if (jogador.pontuacao_total < ultimaPontuacao) {
-      posicaoAtual++;
-      ultimaPontuacao = jogador.pontuacao_total;
-    }
-    return { ...jogador, posicaoReal: posicaoAtual };
-  }) || [];
-
   return (
     <>
       <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col group hover:border-emerald-500/20 transition-all relative overflow-hidden">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <span>📈</span> Ranking
+            <span>👑</span> Ranking
           </h2>
           <span className="text-[10px] font-bold text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
             Ao Vivo
@@ -46,10 +33,10 @@ export default function PainelTabelaClient({ listaRanking, bolaoAtivoId }: Paine
         
         <div className="flex-1 relative flex flex-col mt-2">
           <div className="flex flex-col gap-2">
-            {rankingComPosicao.slice(0, 5).map((jogador) => (
+            {/* O map agora NÃO usa mais o 'index', apenas a 'posicaoReal' do jogador */}
+            {listaRanking?.slice(0, 5).map((jogador) => (
               <div key={jogador.id} className="flex justify-between items-center bg-black/40 p-3 rounded-xl border border-white/5">
                 <div className="flex items-center gap-3 min-w-0">
-                  {/* Usa a posicaoReal para definir a cor em vez do index */}
                   <span className={`font-black text-sm w-5 text-center ${jogador.posicaoReal === 1 ? 'text-amber-400' : jogador.posicaoReal === 2 ? 'text-gray-300' : jogador.posicaoReal === 3 ? 'text-amber-700' : 'text-gray-600'}`}>
                     {jogador.posicaoReal}º
                   </span>
@@ -65,7 +52,7 @@ export default function PainelTabelaClient({ listaRanking, bolaoAtivoId }: Paine
               </div>
             ))}
 
-            {rankingComPosicao.length === 0 && (
+            {listaRanking?.length === 0 && (
               <div className="text-center text-sm text-gray-500 py-4">Nenhum dado disponível</div>
             )}
           </div>
@@ -84,7 +71,7 @@ export default function PainelTabelaClient({ listaRanking, bolaoAtivoId }: Paine
       <RankingModal 
         isOpen={isModalTabelaOpen} 
         onClose={() => setIsModalTabelaOpen(false)} 
-        listaRanking={rankingComPosicao} // <- Passamos a lista já com as posições reais!
+        listaRanking={listaRanking}
         bolaoAtivoId={bolaoAtivoId}
       />
     </>

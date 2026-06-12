@@ -5,7 +5,7 @@ interface JogadorRanking {
   nomeUsuario: string
   nomeBolao: string
   pontuacao_total: number
-  posicaoReal?: number // Nova propriedade opcional vinda do Painel
+  posicaoReal: number 
 }
 
 interface RankingModalProps {
@@ -36,17 +36,18 @@ export default function RankingModal({ isOpen, onClose, listaRanking, bolaoAtivo
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-2">
+          {/* Aqui também removemos qualquer menção ao índice visual */}
           {listaRanking?.map((jogador) => (
             <div 
               key={jogador.id} 
               className={`flex justify-between items-center p-4 rounded-2xl border transition-colors ${
-                jogador.id === bolaoAtivoId
+                String(jogador.id) === String(bolaoAtivoId)
                   ? 'bg-emerald-900/20 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]' 
                   : 'bg-black/40 border-white/5 hover:bg-white/[0.02]'
               }`}
             >
               <div className="flex items-center gap-4 min-w-0">
-                {/* Distribuição inteligente de Medalhas baseada no Rank real */}
+                {/* As medalhas leem APENAS a posição oficial do servidor */}
                 <div className="w-8 flex justify-center shrink-0">
                   {jogador.posicaoReal === 1 ? <span className="text-2xl drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]">🥇</span> :
                    jogador.posicaoReal === 2 ? <span className="text-2xl drop-shadow-[0_0_10px_rgba(156,163,175,0.5)]">🥈</span> :
@@ -55,7 +56,7 @@ export default function RankingModal({ isOpen, onClose, listaRanking, bolaoAtivo
                 </div>
 
                 <div className="flex flex-col truncate">
-                  <span className={`font-bold text-sm sm:text-base truncate ${jogador.id === bolaoAtivoId ? 'text-emerald-400' : 'text-white'}`}>
+                  <span className={`font-bold text-sm sm:text-base truncate ${String(jogador.id) === String(bolaoAtivoId) ? 'text-emerald-400' : 'text-white'}`}>
                     {jogador.nomeUsuario}
                   </span>
                   <span className="text-xs text-gray-500 uppercase tracking-wider truncate">

@@ -116,17 +116,35 @@ export default async function DashboardPage() {
     pontuacao_total: b.pontuacao_total || 0
   })) || []
 
-  // 4. LÓGICA DE EMPATE (Dense Ranking) calculada no servidor
-  let posicaoAtual = 1;
-  let ultimaPontuacao = listaRankingBruta?.[0]?.pontuacao_total ?? -1;
-
-  const listaRanking = listaRankingBruta.map((jogador) => {
-    if (jogador.pontuacao_total < ultimaPontuacao) {
-      posicaoAtual++;
-      ultimaPontuacao = jogador.pontuacao_total;
+  listaRankingBruta.sort((a, b) => {
+    // Regra 1: Quem tem mais pontos fica na frente
+    if (b.pontuacao_total !== a.pontuacao_total) {
+      return b.pontuacao_total - a.pontuacao_total;
     }
-    return { ...jogador, posicaoReal: posicaoAtual };
+    // Regra 2: Empatou nos pontos? Ordem alfabética no nome do usuário
+    const nomeCompare = a.nomeUsuario.localeCompare(b.nomeUsuario);
+    if (nomeCompare !== 0) return nomeCompare;
+    
+    // Regra 3: Se a mesma pessoa tiver dois bolões empatados, desempata pelo nome do bolão
+    return a.nomeBolao.localeCompare(b.nomeBolao);
   });
+
+  // 4. LÓGICA DE EMPATE calculada no servidor
+  let rankParaMostrar = 1;
+
+  const listaRanking = listaRankingBruta.map((jogador, index) => {
+    if (index > 0) {
+      const jogadorAnterior = listaRankingBruta[index - 1];
+      
+      // Se a pontuação for menor que a do cara de cima, a posição vira o índice atual + 1
+      if (jogador.pontuacao_total < jogadorAnterior.pontuacao_total) {
+        rankParaMostrar = index + 1;
+      }
+      // Se for igual, ele pula o 'if' e mantém o mesmo 'rankParaMostrar' do cara de cima
+    }
+    
+    return { ...jogador, posicaoReal: rankParaMostrar };
+  }); 
 
    return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans relative overflow-hidden pb-12 selection:bg-teal-500 selection:text-white">
