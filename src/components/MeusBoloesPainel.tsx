@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 interface Bolao {
   id: string
   nome: string
+  pontuacao_total: number
 }
 
 interface Partida {
@@ -19,6 +20,8 @@ interface Partida {
   data_hora: string
   fase: string
   status: string
+  gols_casa: number
+  gols_fora: number
 }
 
 interface TimeCopa {
@@ -45,8 +48,8 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
   const [bolaoAtivo, setBolaoAtivo] = useState<Bolao | null>(null)
   const [abaAtiva, setAbaAtiva] = useState('1a_fase')
   const [palpitesGrupos, setPalpitesGrupos] = useState<Record<string, Record<number, string>>>({})
-  const [palpites1aFase, setPalpites1aFase] = useState<Record<string, Record<string, { casa: string, fora: string }>>>({})
-  const [palpites2aFase, setPalpites2aFase] = useState<Record<string, Record<string, { casa: string, fora: string }>>>({})
+  const [palpites1aFase, setPalpites1aFase] = useState<Record<string, Record<string, { casa: string, fora: string, pontos: string }>>>({})
+  const [palpites2aFase, setPalpites2aFase] = useState<Record<string, Record<string, { casa: string, fora: string, pontos: string }>>>({})
   const [palpitesMataMata, setPalpitesMataMata] = useState<Record<string, {
     r32: Record<number, string>;
     r16: Record<number, string>;
@@ -102,8 +105,8 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
         ])
 
         // A) Jogos 
-        const rec1aFase: Record<string, Record<string, { casa: string, fora: string }>> = {}
-        const rec2aFase: Record<string, Record<string, { casa: string, fora: string }>> = {}
+        const rec1aFase: Record<string, Record<string, { casa: string, fora: string, pontos: string }>> = {}
+        const rec2aFase: Record<string, Record<string, { casa: string, fora: string, pontos: string }>> = {}
         const todasAsPartidas = [...partidas1f, ...partidas2f] // Junta as duas props
         
         resJogos.data?.forEach(p => {
@@ -115,7 +118,7 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
             const target = is1aFase ? rec1aFase : rec2aFase
             
             if (!target[p.bolao_id]) target[p.bolao_id] = {}
-            target[p.bolao_id][jogoOriginal.id] = { casa: p.gols_casa.toString(), fora: p.gols_fora.toString() }
+            target[p.bolao_id][jogoOriginal.id] = { casa: p.gols_casa.toString(), fora: p.gols_fora.toString(), pontos: p.pontos.toString() }
           }
         })
         setPalpites1aFase(rec1aFase)
@@ -323,7 +326,8 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
     const novoBolaoDB = {
       id: crypto.randomUUID(), 
       nome: `BOLÃO ${proximoNumero}`,
-      user_id: user.id
+      user_id: user.id,
+      pontuacao_total: 0
     }
 
     try {
@@ -332,7 +336,7 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
       if (error) throw error
 
       // 2. Atualiza a tela local (Omitindo o user_id para respeitar sua Interface)
-      const novoBolaoLocal: Bolao = { id: novoBolaoDB.id, nome: novoBolaoDB.nome }
+      const novoBolaoLocal: Bolao = { id: novoBolaoDB.id, nome: novoBolaoDB.nome, pontuacao_total: novoBolaoDB.pontuacao_total }
       setBoloes([...boloes, novoBolaoLocal])
 
       // 3. A MÁGICA: Manda o page.tsx atualizar o preço sem dar F5!
@@ -670,11 +674,19 @@ const handleAbrirBolao = (bolao: Bolao) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/90 backdrop-blur-sm">
           <div className="bg-[#0a0a0a] border-0 sm:border border-white/10 w-full sm:max-w-4xl h-full sm:h-[85vh] flex flex-col justify-between sm:rounded-3xl shadow-2xl relative overflow-hidden">
             
-            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-black/40 backdrop-blur-md">
+            <div className="p-4 sm:p-6 border-b border-white/5 flex justify-between items-center bg-black/40 backdrop-blur-md">
               <div>
                 <span className="text-xs font-bold uppercase tracking-[0.2em] text-teal-400">Cartela de Palpites</span>
-                <h3 className="text-xl font-black text-white uppercase mt-0.5">{username} / {bolaoAtivo.nome}</h3>
-              </div>
+                
+                {/* MUDANÇA 1: Cabeçalho com a Tag de Pontuação Total */}
+                <h3 className="text-lg sm:text-xl font-black text-white uppercase mt-0.5 flex flex-wrap items-center gap-2 sm:gap-3">
+                  <span className="truncate max-w-[200px] sm:max-w-none">{username} / {bolaoAtivo.nome}</span>
+                  <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-400 px-2.5 py-0.5 rounded-lg text-xs sm:text-sm font-black tracking-wide flex items-center gap-1.5 shadow-[0_0_10px_rgba(245,158,11,0.1)]">
+                    🏆 {bolaoAtivo.pontuacao_total || 0} pts
+                  </div>
+                </h3>
+
+              </div> 
               <button 
                 onClick={isInscricoesEncerradas ? handleFecharBolao : handleSalvarBolao}
                 disabled={isSaving}
@@ -714,9 +726,10 @@ const handleAbrirBolao = (bolao: Bolao) => {
                     ) : (
                       partidas1f.map((jogo) => {
                         const { diaMes, hora } = formatarData(jogo.data_hora)
-                        const palpiteCasa = palpites1aFase[bolaoAtivo.id]?.[jogo.id]?.casa ?? ''
-                        const palpiteFora = palpites1aFase[bolaoAtivo.id]?.[jogo.id]?.fora ?? ''
-
+                        const palpite = palpites1aFase[bolaoAtivo.id]?.[jogo.id]
+                        const palpiteCasa = palpite?.casa ?? ''
+                        const palpiteFora = palpite?.fora ?? ''
+                        const pontosGanhos = palpite?.pontos ?? 0
                         return (
                           <div key={jogo.id} className="flex items-center justify-between px-3 py-4 sm:px-6 border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                             
@@ -733,43 +746,57 @@ const handleAbrirBolao = (bolao: Bolao) => {
                                   {jogo.time_casa}
                                 </span>
                               </div>
+                              <div className="flex flex-col items-center justify-center shrink-0">
+                             {/* PALPITE DO USUÁRIO */}
+                                <div className="flex items-center gap-1 sm:gap-4">
+                                  {isInscricoesEncerradas ? (
+                                    <>
+                                      <div className={`w-8 h-10 sm:w-12 sm:h-14 flex items-center justify-center border rounded-lg sm:rounded-xl text-base sm:text-xl font-black shadow-inner ${jogo.status === 'FT' ? 'bg-black/80 border-white/5 text-gray-400' : 'bg-black/50 border-white/10 text-white'}`}>
+                                        {palpiteCasa !== '' ? palpiteCasa : '-'}
+                                      </div>
+                                      <span className="text-gray-600 font-bold text-xs sm:text-sm">X</span>
+                                      <div className={`w-8 h-10 sm:w-12 sm:h-14 flex items-center justify-center border rounded-lg sm:rounded-xl text-base sm:text-xl font-black shadow-inner ${jogo.status === 'FT' ? 'bg-black/80 border-white/5 text-gray-400' : 'bg-black/50 border-white/10 text-white'}`}>
+                                        {palpiteFora !== '' ? palpiteFora : '-'}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <input 
+                                        type="text" 
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        maxLength={2}
+                                        value={palpiteCasa}
+                                        onChange={(e) => handlePalpite1aFase(jogo.id, 'casa', e.target.value)}
+                                        className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black border border-white/40 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
+                                      />
+                                      <span className="text-gray-500 font-bold text-xs sm:text-sm">X</span>
+                                      <input 
+                                        type="text" 
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        maxLength={2}
+                                        value={palpiteFora}
+                                        onChange={(e) => handlePalpite1aFase(jogo.id, 'fora', e.target.value)}
+                                        className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black border border-white/40 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
+                                      />
+                                    </>
+                                  )}
+                                </div>
 
-                              <div className="flex items-center gap-1 sm:gap-4 shrink-0">
-                                {/* BLOQUEIO CONDICIONAL: 1A FASE */}
-                                {isInscricoesEncerradas ? (
-                                  <>
-                                    <div className="w-8 h-10 sm:w-12 sm:h-14 flex items-center justify-center bg-black/50 border border-white/10 rounded-lg sm:rounded-xl text-base sm:text-xl font-black text-white shadow-inner">
-                                      {palpiteCasa !== '' ? palpiteCasa : '-'}
-                                    </div>
-                                    <span className="text-gray-600 font-bold text-xs sm:text-sm">X</span>
-                                    <div className="w-8 h-10 sm:w-12 sm:h-14 flex items-center justify-center bg-black/50 border border-white/10 rounded-lg sm:rounded-xl text-base sm:text-xl font-black text-white shadow-inner">
-                                      {palpiteFora !== '' ? palpiteFora : '-'}
-                                    </div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <input 
-                                      type="text" 
-                                      inputMode="numeric"
-                                      pattern="[0-9]*"
-                                      maxLength={2}
-                                      value={palpiteCasa}
-                                      onChange={(e) => handlePalpite1aFase(jogo.id, 'casa', e.target.value)}
-                                      className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black border border-white/40 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
-                                    />
-                                    <span className="text-gray-500 font-bold text-xs sm:text-sm">X</span>
-                                    <input 
-                                      type="text" 
-                                      inputMode="numeric"
-                                      pattern="[0-9]*"
-                                      maxLength={2}
-                                      value={palpiteFora}
-                                      onChange={(e) => handlePalpite1aFase(jogo.id, 'fora', e.target.value)}
-                                      className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black border border-white/40 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
-                                    />
-                                  </>
+                                {/* PLACAR OFICIAL (Aparece centralizado embaixo apenas quando finalizado) */}
+                                {jogo.status === 'FT' && (
+                                  <div className="mt-1 sm:mt-1.5 flex flex-col items-center leading-none">
+                                    <span className="font-black text-[10px] sm:text-xs text-gray-300 tracking-[0.15em]">
+                                      {jogo.gols_casa} x {jogo.gols_fora}
+                                    </span>
+                                    <span className="text-[7px] sm:text-[8px] uppercase tracking-widest text-gray-500 mt-1">
+                                      Oficial
+                                    </span>
+                                  </div>
                                 )}
-                              </div>
+
+                              </div> 
                               
                               <div className="flex flex-col items-center gap-1 w-16 sm:w-28 overflow-hidden shrink-0">
                                 <img src={jogo.bandeira_fora || '/placeholder-flag.png'} alt={jogo.time_fora} className="w-6 h-6 sm:w-10 sm:h-10 rounded-full object-cover shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/10 bg-white/5" />
@@ -781,10 +808,26 @@ const handleAbrirBolao = (bolao: Bolao) => {
                             </div>
 
                             <div className="w-12 sm:w-16 flex items-center justify-center shrink-0">
-                              <span className="text-[9px] sm:text-[11px] font-bold text-teal-500/50 flex gap-1">
-                                <span className="text-amber-400/50">-</span> pts
-                              </span>
-                            </div>
+                              {jogo.status === 'FT' ? (
+                                // Renderiza o selo brilhante se o jogo já terminou
+                                <div 
+                                  className={`flex items-baseline gap-0.5 px-2 py-1 rounded border font-black text-[10px] sm:text-xs transition-colors ${
+                                    pontosGanhos === '10' ? 'bg-amber-400/10 border-amber-400/30 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.25)]' :
+                                    pontosGanhos === '7'  ? 'bg-green-500/10 border-green-500/30 text-green-400 shadow-[0_0_8px_rgba(34,197,94,0.15)]' :
+                                    pontosGanhos === '5'  ? 'bg-white/10 border-white/20 text-white shadow-[0_0_8px_rgba(255,255,255,0.1)]' :
+                                    pontosGanhos === '2'  ? 'bg-orange-500/10 border-orange-500/30 text-orange-500 shadow-[0_0_8px_rgba(253,224,71,0.1)]' :
+                                    'bg-red-500/10 border-red-500/30 text-red-500 shadow-[0_0_8px_rgba(239,68,68,0.15)]'
+                                  }`}
+                                >
+                                  {pontosGanhos} <span className="text-[8px] font-normal opacity-70">pts</span>
+                                </div>
+                              ) : (
+                                // Mantém o traço se o jogo ainda vai acontecer
+                                <span className="text-[9px] sm:text-[11px] font-bold text-teal-500/50 flex gap-1">
+                                  <span className="text-amber-400/50">-</span> pts
+                                </span>
+                              )}
+                             </div> 
 
                           </div>
                         )
