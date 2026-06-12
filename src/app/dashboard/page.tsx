@@ -178,7 +178,7 @@ export default async function DashboardPage() {
         <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col group hover:border-purple-500/20 transition-all">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <span>📊</span> Palpites
+              <span>📊</span> Tabela
             </h2>
             <span className="text-[10px] font-bold text-gray-500 border border-gray-600/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
               Oculto
