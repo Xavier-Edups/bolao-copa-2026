@@ -37,7 +37,7 @@ export default function PainelTabelaClient({ listaRanking, bolaoAtivoId }: Paine
       <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col group hover:border-emerald-500/20 transition-all relative overflow-hidden">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <span>📈</span> Tabela
+            <span>📈</span> Ranking
           </h2>
           <span className="text-[10px] font-bold text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
             Ao Vivo
