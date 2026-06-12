@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const adminSecret = process.env.ADMIN_SECRET!
-const cronSecret = process.env.CRON_SECRET!
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.NEXT_SECRET_SUPABASE_KEY!
-const footballApiKey = process.env.API_FOOTBALL_KEY!
-const publicUrl = process.env.NEXT_PUBLIC_APP_URL!
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!, 
+  process.env.NEXT_SECRET_SUPABASE_KEY!
+)
 
 export async function GET(req: NextRequest) {
+  // Proteção da Rota via Header
   const secretHeader = req.headers.get('x-admin-secret')
   if (secretHeader !== process.env.ADMIN_SECRET) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
@@ -28,7 +25,7 @@ export async function GET(req: NextRequest) {
 
     if (erroPartidas) throw erroPartidas
 
-    // [OTIMIZAÇÃO] Se não tem jogo rolando nem prestes a começar, encerra com 0 chamadas de API
+    // Se não tem jogo rolando, encerra e poupa a API
     if (!partidasCriticas || partidasCriticas.length === 0) {
       return NextResponse.json({ 
         success: true, 
@@ -36,49 +33,46 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // 2. Se chegou aqui, significa que precisamos atualizar! Fazemos 1 chamada na API de futebol
-    // Substitua pela URL real da sua competição ou endpoint do football-data
+    // 2. Consulta a API externa
     const resFootball = await fetch('https://api.football-data.org/v4/matches', {
-      headers: { 'X-Auth-Token': footballApiKey },
-      next: { revalidate: 0 } // Garante dados frescos, sem cache
+      headers: { 'X-Auth-Token': process.env.FOOTBALL_DATA_API_KEY! },
+      next: { revalidate: 0 } 
     })
 
     if (!resFootball.ok) throw new Error('Falha ao consultar football-data')
     const dadosFutebol = await resFootball.json()
     const jogosDaApi = dadosFutebol.matches || []
 
-    // 3. Puxa do banco os jogos internos para cruzar os dados
+    // 3. Puxa do banco os jogos internos
     const { data: partidasBanco } = await supabaseAdmin.from('partidas').select('*')
 
     let houveJogoFinalizado = false
 
     // 4. Atualiza os placares no Supabase
     for (const jogoBanco of partidasBanco || []) {
-      // Encontra o jogo correspondente vindo da API externa (via fixture_id ou ID equivalente)
       const jogoApi = jogosDaApi.find((m: any) => m.id === jogoBanco.fixture_id)
       if (!jogoApi) continue
 
-      // Mapeia o status da API para o seu padrão de banco de dados
       let novoStatus = jogoBanco.status
       if (jogoApi.status === 'FINISHED') novoStatus = 'FT'
       else if (jogoApi.status === 'IN_PLAY' || jogoApi.status === 'PAUSED') novoStatus = 'LIVE'
       else if (jogoApi.status === 'TIMED' || jogoApi.status === 'SCHEDULED') novoStatus = 'NS'
 
+      // Leitura robusta dos gols da API (garantindo que se vier vazio, preserva o banco)
       const novosGolsCasa = jogoApi.score?.fullTime?.home ?? jogoBanco.gols_casa
       const novosGolsFora = jogoApi.score?.fullTime?.away ?? jogoBanco.gols_fora
 
-      // Detecta a virada de chave: o jogo estava LIVE no banco, mas a API avisou que terminou (FINISHED -> FT)
       if (jogoBanco.status === 'LIVE' && novoStatus === 'FT') {
         houveJogoFinalizado = true
       }
 
-      // Se mudou o placar ou o status, atualiza a linha da partida no banco
+      // Se algo mudou, envia para o banco
       if (
         jogoBanco.status !== novoStatus || 
         jogoBanco.gols_casa !== novosGolsCasa || 
         jogoBanco.gols_fora !== novosGolsFora
       ) {
-        await supabaseAdmin
+        const { error: updateError } = await supabaseAdmin
           .from('partidas')
           .update({
             status: novoStatus,
@@ -86,33 +80,53 @@ export async function GET(req: NextRequest) {
             gols_fora: novosGolsFora
           })
           .eq('id', jogoBanco.id)
+
+        // Se falhar de salvar a linha específica, avisa no log mas não derruba a aplicação
+        if (updateError) {
+          console.error(`Erro ao atualizar partida ${jogoBanco.id}:`, updateError)
+        }
       }
     }
 
-    // 5. SE ALGUM JOGO ACABOU DE TERMINAR: Dispara o cálculo de ranking do Bolão automaticamente!
+    // 5. SE ALGUM JOGO ACABOU DE TERMINAR: Dispara o cálculo de ranking
     if (houveJogoFinalizado) {
-      // Faz uma chamada interna para a rota de pontos que criamos anteriormente
-      // O 'process.env.NEXT_PUBLIC_APP_URL' guarda a URL base do seu site (ex: https://seu-bolao.vercel.app)
-      await fetch(`${publicUrl}/api/admin/processar-pontos`, {
-        method: 'POST',
-        headers: {
-          'x-admin-secret': adminSecret,
-        },
-      })
-      
+      try {
+        const protocol = req.headers.get('x-forwarded-proto') || 'https'
+        const host = req.headers.get('host')
+        const baseUrl = `${protocol}://${host}`
+
+        console.log(`[Cron] Jogo finalizado detectado! Chamando: ${baseUrl}/api/admin/processar-pontos`)
+
+        const resProcessar = await fetch(`${baseUrl}/api/admin/processar-pontos`, {
+          method: 'POST',
+          headers: {
+            'x-admin-secret': process.env.ADMIN_SECRET!,
+          },
+        })
+        
+        if (!resProcessar.ok) {
+          const erroTexto = await resProcessar.text()
+          console.error('[Cron] Ocorreu um erro na rota processar-pontos:', erroTexto)
+        }
+      } catch (internalErr) {
+        // Se a chamada de pontos falhar por timeout de rede ou URL maluca, 
+        // ele cai AQUI, e NÃO derruba o fato de que a partida já foi gravada como 'FT'.
+        console.error('[Cron] Falha de conexão ao acionar processar-pontos:', internalErr)
+      }
+
       return NextResponse.json({ 
         success: true, 
-        message: 'Placares sincronizados e novo ranking calculado com sucesso!' 
+        message: 'Placares sincronizados e ranking disparado com sucesso!' 
       })
     }
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Placares sincronizados. Nenhum jogo novo finalizado nesta janela.' 
+      message: 'Placares sincronizados. Jogo continua LIVE.' 
     })
 
   } catch (err: any) {
-    console.error('Erro no Cron de Sincronização:', err)
+    console.error('Erro Fatal no Cron de Sincronização:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
