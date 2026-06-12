@@ -1,9 +1,11 @@
 import { createClient } from '@/utils/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { logout } from '../auth/actions'
 import Link from 'next/link'
 import RegulamentoModal from '@/components/RegulamentoModal'
 import MeusBoloesPainel from '@/components/MeusBoloesPainel'
+import PainelTabelaClient from '@/components/PainelTabelaClient' // Importação corrigida
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -11,52 +13,50 @@ export default async function DashboardPage() {
   // Recupera o usuário logado
   const { data: { user } } = await supabase.auth.getUser()
 
+  if (!user) {
+    redirect('/login')
+  }
+
   let qtdBoloes = 0
   let valorPago = 0
 
-  if (user) {
-    const { count } = await supabase
-      .from('boloes')
-      .select('*', { count: 'exact', head: true }) // head: true diz pro Supabase não baixar os dados, só contar as linhas!
-      .eq('user_id', user.id)
-    qtdBoloes = count || 0
+  const { count } = await supabase
+    .from('boloes')
+    .select('*', { count: 'exact', head: true }) 
+    .eq('user_id', user.id)
+  qtdBoloes = count || 0
 
-    const { data: pagData } = await supabase
-      .from('pagamentos_usuarios')
-      .select('valor_pago')
-      .eq('user_id', user.id)
-      .single()
-    valorPago = pagData?.valor_pago || 0
-  }
+  const { data: pagData } = await supabase
+    .from('pagamentos_usuarios')
+    .select('valor_pago')
+    .eq('user_id', user.id)
+    .single()
+  valorPago = pagData?.valor_pago || 0
+
   const valorTotal = qtdBoloes * 30
   const saldoDevedor = Math.max(0, valorTotal - valorPago)
   const temCredito = valorPago > valorTotal
   const isPago = (qtdBoloes > 0 && saldoDevedor === 0) || temCredito
   
-  // Proteção: Se não estiver logado, joga para a tela de login
-  if (!user) {
-    redirect('/login')
-  }
-
   // Pega o nome completo salvo nos metadados do cadastro (ou usa 'Craque' como fallback)
   const nomeUsuario = user.user_metadata?.full_name || 'Craque'
 
-  // Busca as partidas da fase de gupos
-  const { data: partidas1f, error: error1f } = await supabase
+  // Busca as partidas da fase de grupos
+  const { data: partidas1f } = await supabase
     .from('partidas')
     .select('*')
     .eq('fase', 'GROUP_STAGE')
     .order('data_hora', { ascending: true })
 
   // Busca as partidas do mata-mata
-  const { data: partidas2f, error: error2f } = await supabase
+  const { data: partidas2f } = await supabase
     .from('partidas')
     .select('*')
     .neq('fase', 'GROUP_STAGE')
     .order('data_hora', { ascending: true })
 
   // BUSCA OS TIMES E GRUPOS
-  const { data: times, error: errorTimes } = await supabase
+  const { data: times } = await supabase
     .from('times_copa')
     .select('*')
     .order('grupo', { ascending: true })
@@ -67,10 +67,68 @@ export default async function DashboardPage() {
     .order('nome', { ascending: true })
     .limit(3000)
 
-  //console.log(times)
+  const { data: boloesRanking } = await supabase
+    .from('boloes')
+    .select('id, nome, user_id, pontuacao_total')
+    .order('pontuacao_total', { ascending: false })
 
+  const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_SECRET_SUPABASE_KEY!
+  )
 
-  return (
+  // 1. Contorna a paginação do Supabase buscando lotes de 1000 usuários
+  let listaUsuariosAuth: any[] = []
+  let paginaAuth = 1
+  let temMaisUsuarios = true
+
+  while (temMaisUsuarios) {
+    const { data: resAuth } = await supabaseAdmin.auth.admin.listUsers({
+      page: paginaAuth,
+      perPage: 1000
+    })
+
+    if (resAuth && resAuth.users && resAuth.users.length > 0) {
+      listaUsuariosAuth = listaUsuariosAuth.concat(resAuth.users)
+      if (resAuth.users.length < 1000) {
+        temMaisUsuarios = false // Chegou na última página
+      } else {
+        paginaAuth++ // Puxa a próxima página
+      }
+    } else {
+      temMaisUsuarios = false
+    }
+  }
+
+  // 2. Cria um dicionário super rápido { "id_do_usuario": "Nome Completo" } com TODOS os usuários
+  const mapaNomes = new Map(
+    listaUsuariosAuth.map(u => [
+      u.id, 
+      u.user_metadata?.full_name || u.user_metadata?.nome || 'Craque'
+    ])
+  )
+
+  // 3. Monta a lista bruta cruzando o banco público com os nomes da Auth
+  const listaRankingBruta = boloesRanking?.map((b) => ({
+    id: b.id,
+    nomeBolao: b.nome,
+    nomeUsuario: b.user_id === user.id ? nomeUsuario : (mapaNomes.get(b.user_id) || "Craque"),
+    pontuacao_total: b.pontuacao_total || 0
+  })) || []
+
+  // 4. LÓGICA DE EMPATE (Dense Ranking) calculada no servidor
+  let posicaoAtual = 1;
+  let ultimaPontuacao = listaRankingBruta?.[0]?.pontuacao_total ?? -1;
+
+  const listaRanking = listaRankingBruta.map((jogador) => {
+    if (jogador.pontuacao_total < ultimaPontuacao) {
+      posicaoAtual++;
+      ultimaPontuacao = jogador.pontuacao_total;
+    }
+    return { ...jogador, posicaoReal: posicaoAtual };
+  });
+
+   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans relative overflow-hidden pb-12 selection:bg-teal-500 selection:text-white">
       
       {/* Luzes de Fundo (Glows) */}
@@ -110,33 +168,17 @@ export default async function DashboardPage() {
           partidas2f={partidas2f || []}
           times={times || []}
           jogadores={jogadores || []}
+          listaRanking={listaRanking || []}
         /> 
 
-        
-        {/*
-        {/* Painel 3: Tabela /}
-        <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col group hover:border-emerald-500/20 transition-all">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <span>📈</span> Tabela
-            </h2>
-            <span className="text-[10px] font-bold text-gray-500 border border-gray-600/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
-              Bloqueado
-            </span>
-          </div>
-          
-          <div className="flex-1 flex flex-col items-center justify-center p-6 mt-2 bg-black/20 border border-white/5 rounded-2xl text-center">
-            <span className="text-3xl mb-3 opacity-40">⏳</span>
-            <p className="text-sm font-bold text-gray-300">Aguardando Início</p>
-            <p className="text-xs text-gray-500 mt-1">A classificação estará disponível após o começo do campeonato.</p>
-          </div>
-        </div>
+        {/* Painel 3: Tabela (Agora isolado e rodando limpo) */}
+        <PainelTabelaClient listaRanking={listaRanking} bolaoAtivoId={undefined} />
 
-        {/* Painel 4: Palpites (Antigas Estatísticas) /}
+        {/* Painel 4: Palpites (Antigas Estatísticas) */}
         <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col group hover:border-purple-500/20 transition-all">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <span>📊</span> Palpites
+              <span>📊</span> Tabela
             </h2>
             <span className="text-[10px] font-bold text-gray-500 border border-gray-600/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
               Oculto
@@ -145,11 +187,10 @@ export default async function DashboardPage() {
           
           <div className="flex-1 flex flex-col items-center justify-center p-6 mt-2 bg-black/20 border border-white/5 rounded-2xl text-center">
             <span className="text-3xl mb-3 opacity-40">🔒</span>
-            <p className="text-sm font-bold text-gray-300">Palpites Ocultos</p>
-            <p className="text-xs text-gray-500 mt-1">As escolhas dos outros competidores estarão disponíveis após o começo do campeonato.</p>
+            <p className="text-sm font-bold text-gray-300">Palpites Indisponíveis</p>
+            <p className="text-xs text-gray-500 mt-1">Under Construction</p>
           </div>
         </div>
-        */}
 
         {/* Painel 2: Status do Pagamento Dinâmico */}
         <div className={`bg-white/[0.02] border rounded-3xl p-6 backdrop-blur-xl flex flex-col justify-between group transition-all duration-500 ${
