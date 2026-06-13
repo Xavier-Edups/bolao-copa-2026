@@ -16,6 +16,9 @@ export default function AdminPagamentos() {
   const [loading, setLoading] = useState(false)
   const [valoresEditados, setValoresEditados] = useState<Record<string, string>>({})
   const [processandoId, setProcessandoId] = useState<string | null>(null)
+  
+  // NOVO ESTADO: Controle do Botão de Pânico
+  const [isSyncing, setIsSyncing] = useState(false)
 
   // Carrega a listagem chamando a nossa API interna protegida
   const buscarDadosUsuarios = async (chaveSecreta: string) => {
@@ -74,6 +77,49 @@ export default function AdminPagamentos() {
     }
   }
 
+// NOVO MÉTODO: Dispara o Cron Job e o Cálculo Manualmente
+  const handleSincronizacaoManual = async () => {
+    const confirmacao = window.confirm('⚠️ ATENÇÃO: Isso vai forçar uma chamada na API do Football-Data e recalcular o ranking de todo mundo.\n\nDeseja continuar?')
+    if (!confirmacao) return
+
+    // Pede o CRON_SECRET na hora (já que é diferente da senha do Admin)
+    const cronSecret = window.prompt('🔒 Para confirmar, digite o CRON_SECRET do sistema:')
+    if (!cronSecret) return // Se cancelar ou deixar vazio, aborta a missão
+
+    setIsSyncing(true)
+    try {
+      // 1. Chama a rota de Sincronização de Partidas (usando o CRON_SECRET)
+      const resPartidas = await fetch(`/api/sync-partidas?secret=${cronSecret}`, {
+        method: 'GET'
+      })
+      
+      if (!resPartidas.ok) {
+        const erroPartidas = await resPartidas.text()
+        throw new Error(`Falha ao buscar partidas: ${erroPartidas}`)
+      }
+
+      // 2. Chama a rota de Processamento de Pontos (usando a senha do Admin que já estava logada)
+      const resPontos = await fetch('/api/admin/processar-pontos', {
+        method: 'POST',
+        headers: { 
+          'x-admin-secret': secret 
+        }
+      })
+
+      if (!resPontos.ok) {
+        const erroPontos = await resPontos.text()
+        throw new Error(`Falha ao calcular pontos: ${erroPontos}`)
+      }
+
+      alert('✅ Sincronização completa! Partidas atualizadas e pontos recalculados.')
+    } catch (err: any) {
+      console.error(err)
+      alert(`❌ Erro na Sincronização Manual:\n\n${err.message}`)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   // Formulário de Bloqueio por Token Secreto
   if (!isAutenticado) {
     return (
@@ -112,16 +158,42 @@ export default function AdminPagamentos() {
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 border-b border-zinc-800 pb-6">
           <div>
             <h1 className="text-2xl font-black text-white flex items-center gap-2">
-              <span>⚙️</span> Painel Financeiro Geral
+              <span>⚙️</span> Painel Administrativo
             </h1>
-            <p className="text-xs text-gray-400 mt-1">Gerenciamento dinâmico de faturamento por usuário ativo.</p>
+            <p className="text-xs text-gray-400 mt-1">Gerenciamento financeiro e controles de sistema.</p>
           </div>
-          <button 
-            onClick={() => { setIsAutenticado(false); setSecret(''); }}
-            className="text-xs font-bold bg-zinc-900 border border-zinc-800 hover:border-red-500/30 hover:text-red-400 px-4 py-2 rounded-xl transition-colors"
-          >
-            Bloquear Painel
-          </button>
+          
+          {/* GRUPO DE BOTÕES DO HEADER */}
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            {/* BOTÃO DE PÂNICO */}
+            <button 
+              onClick={handleSincronizacaoManual}
+              disabled={isSyncing}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all border ${
+                isSyncing 
+                  ? 'bg-amber-500/20 text-amber-500 border-amber-500/20 cursor-wait' 
+                  : 'bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500 hover:text-black'
+              }`}
+            >
+              {isSyncing ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                  Sincronizando...
+                </>
+              ) : (
+                <>
+                  <span>🚨</span> Forçar Sincronia
+                </>
+              )}
+            </button>
+
+            <button 
+              onClick={() => { setIsAutenticado(false); setSecret(''); }}
+              className="flex-1 sm:flex-none text-xs font-bold bg-zinc-900 border border-zinc-800 hover:border-red-500/30 hover:text-red-400 px-4 py-2 rounded-xl transition-colors"
+            >
+              Bloquear
+            </button>
+          </div>
         </header>
 
         {/* Tabela de Usuários */}
@@ -149,7 +221,7 @@ export default function AdminPagamentos() {
                         <span className="text-white text-xs">{user.email}</span>
                       </td>
                       <td className="p-4 text-center text-xs text-gray-500">
-                        {new Date(user.updated_at).toLocaleDateString('pt-BR')} às {new Date(user.updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(user.updated_at).toLocaleDateString('pt-BR')} às {new Date(user.updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                       </td>
                       <td className="p-4 flex items-center justify-end gap-3">
                         <div className="relative">
