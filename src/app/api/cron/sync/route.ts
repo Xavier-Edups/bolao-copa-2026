@@ -35,11 +35,17 @@ export async function GET(req: NextRequest) {
 
     // 2. Consulta a API externa
     const resFootball = await fetch('https://api.football-data.org/v4/matches', {
-      headers: { 'X-Auth-Token': process.env.FOOTBALL_DATA_API_KEY! },
+      headers: { 'X-Auth-Token': process.env.API_FOOTBALL_KEY! },
       next: { revalidate: 0 } 
     })
 
-    if (!resFootball.ok) throw new Error('Falha ao consultar football-data')
+    if (!resFootball.ok) {
+      // Capturamos o texto do erro da API para saber o real motivo
+      const erroTexto = await resFootball.text()
+      console.error(`[Cron] Erro API Football-Data (${resFootball.status}):`, erroTexto)
+      throw new Error(`Falha ao consultar football-data: ${resFootball.status} - ${erroTexto}`)
+    }
+
     const dadosFutebol = await resFootball.json()
     const jogosDaApi = dadosFutebol.matches || []
 
