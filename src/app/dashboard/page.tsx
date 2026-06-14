@@ -5,7 +5,8 @@ import { logout } from '../auth/actions'
 import Link from 'next/link'
 import RegulamentoModal from '@/components/RegulamentoModal'
 import MeusBoloesPainel from '@/components/MeusBoloesPainel'
-import PainelTabelaClient from '@/components/PainelTabelaClient' // Importação corrigida
+import PainelTabelaClient from '@/components/PainelTabelaClient'
+import PainelTabelaGeral from '@/components/PainelTabelaGeral' 
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -189,28 +190,18 @@ export default async function DashboardPage() {
           listaRanking={listaRanking || []}
         /> 
 
-        {/* Painel 3: Tabela (Agora isolado e rodando limpo) */}
+        {/* Painel 2: Tabela (Agora isolado e rodando limpo) */}
         <PainelTabelaClient listaRanking={listaRanking} bolaoAtivoId={undefined} />
 
-        {/* Painel 4: Palpites (Antigas Estatísticas) */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col group hover:border-purple-500/20 transition-all">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <span>📊</span> Tabela
-            </h2>
-            <span className="text-[10px] font-bold text-gray-500 border border-gray-600/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
-              Oculto
-            </span>
-          </div>
-          
-          <div className="flex-1 flex flex-col items-center justify-center p-6 mt-2 bg-black/20 border border-white/5 rounded-2xl text-center">
-            <span className="text-3xl mb-3 opacity-40">🔒</span>
-            <p className="text-sm font-bold text-gray-300">Palpites Indisponíveis</p>
-            <p className="text-xs text-gray-500 mt-1">Under Construction</p>
-          </div>
-        </div>
+        {/* Painel 3: Tabela Geral de Palpites (Comunidade) */}
+        <PainelTabelaGeral 
+          partidas1f={partidas1f || []} 
+          partidas2f={partidas2f || []} 
+          listaRanking={listaRanking || []}
+          times={times || []}
+        /> 
 
-        {/* Painel 2: Status do Pagamento Dinâmico */}
+        {/* Painel 4: Status do Pagamento Dinâmico */}
         <div className={`bg-white/[0.02] border rounded-3xl p-6 backdrop-blur-xl flex flex-col justify-between group transition-all duration-500 ${
           isPago ? 'border-emerald-600/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'border-emerald-600'
         }`}>
