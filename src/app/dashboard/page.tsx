@@ -130,7 +130,8 @@ export default async function DashboardPage() {
     id: b.id,
     nomeBolao: b.nome,
     nomeUsuario: b.user_id === user.id ? nomeUsuario : (mapaNomes.get(b.user_id) || "Craque"),
-    pontuacao_total: b.pontuacao_total || 0
+    pontuacao_total: b.pontuacao_total || 0,
+    isMeuBolao: b.user_id === user.id
   })) || []
 
   listaRankingBruta.sort((a, b) => {
