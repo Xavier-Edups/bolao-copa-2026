@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 interface UsuarioPagamento {
   user_id: string
@@ -26,7 +26,8 @@ export default function AdminPagamentos() {
     try {
       const res = await fetch('/api/admin', {
         method: 'GET',
-        headers: { 'x-admin-secret': chaveSecreta }
+        headers: { 'x-admin-secret': chaveSecreta },
+        cache: 'no-store' // <- ADICIONADO: Garante que a lista de usuários venha sempre atualizada do banco
       })
 
       if (!res.ok) throw new Error('Chave inválida ou erro no servidor.')
@@ -77,7 +78,7 @@ export default function AdminPagamentos() {
     }
   }
 
-// NOVO MÉTODO: Dispara o Cron Job e o Cálculo Manualmente
+  // NOVO MÉTODO: Dispara o Cron Job e o Cálculo Manualmente
   const handleSincronizacaoManual = async () => {
     const confirmacao = window.confirm('⚠️ ATENÇÃO: Isso vai forçar uma chamada na API do Football-Data e recalcular o ranking de todo mundo.\n\nDeseja continuar?')
     if (!confirmacao) return
@@ -90,7 +91,8 @@ export default function AdminPagamentos() {
     try {
       // 1. Chama a rota de Sincronização de Partidas (usando o CRON_SECRET)
       const resPartidas = await fetch(`/api/sync-partidas?secret=${cronSecret}`, {
-        method: 'GET'
+        method: 'GET',
+        cache: 'no-store' // Obrigatório
       })
       
       if (!resPartidas.ok) {
@@ -103,7 +105,8 @@ export default function AdminPagamentos() {
         method: 'POST',
         headers: { 
           'x-admin-secret': secret 
-        }
+        },
+        cache: 'no-store' // <- ADICIONADO: Faltava nesta chamada para não correr risco de falhar silenciosamente
       })
 
       if (!resPontos.ok) {

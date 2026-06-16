@@ -17,15 +17,15 @@ export async function GET(req: NextRequest) {
     const agora = new Date()
     const dezMinutosDepois = new Date(agora.getTime() + 10 * 60 * 1000)
 
-    // 1. Procura no banco se há jogos rolando ('LIVE') ou prestes a começar (NS)
+    // 1. Procura no banco estritamente as partidas que precisamos ficar vigiando
     const { data: partidasCriticas, error: erroPartidas } = await supabaseAdmin
       .from('partidas')
-      .select('id, status, data_hora')
+      .select('*') // Puxa todos os campos para usarmos no loop
       .or(`status.eq.LIVE,and(status.eq.NS,data_hora.lte.${dezMinutosDepois.toISOString()})`)
 
     if (erroPartidas) throw erroPartidas
 
-    // Se não tem jogo rolando, encerra e poupa a API
+    // Se não tem jogo rolando, encerra e poupa a API (Isso previne sobrescrever status antigos!)
     if (!partidasCriticas || partidasCriticas.length === 0) {
       return NextResponse.json({ 
         success: true, 
@@ -33,14 +33,23 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // 2. Consulta a API externa
-    const resFootball = await fetch('https://api.football-data.org/v4/matches', {
+    // 2. Consulta a API externa limitando a Copa do Mundo (2000) e janela segura de datas
+    const dataOntem = new Date(agora)
+    dataOntem.setDate(dataOntem.getDate() - 1)
+    const strOntem = dataOntem.toISOString().split('T')[0]
+
+    const dataAmanha = new Date(agora)
+    dataAmanha.setDate(dataAmanha.getDate() + 1)
+    const strAmanha = dataAmanha.toISOString().split('T')[0]
+
+    const apiUrl = `https://api.football-data.org/v4/matches?competitions=2000&dateFrom=${strOntem}&dateTo=${strAmanha}`
+
+    const resFootball = await fetch(apiUrl, {
       headers: { 'X-Auth-Token': process.env.API_FOOTBALL_KEY! },
-      next: { revalidate: 0 } 
+      cache: 'no-store'
     })
 
     if (!resFootball.ok) {
-      // Capturamos o texto do erro da API para saber o real motivo
       const erroTexto = await resFootball.text()
       console.error(`[Cron] Erro API Football-Data (${resFootball.status}):`, erroTexto)
       throw new Error(`Falha ao consultar football-data: ${resFootball.status} - ${erroTexto}`)
@@ -49,14 +58,13 @@ export async function GET(req: NextRequest) {
     const dadosFutebol = await resFootball.json()
     const jogosDaApi = dadosFutebol.matches || []
 
-    // 3. Puxa do banco os jogos internos
-    const { data: partidasBanco } = await supabaseAdmin.from('partidas').select('*')
-
     let houveJogoFinalizado = false
 
-    // 4. Atualiza os placares no Supabase
-    for (const jogoBanco of partidasBanco || []) {
+    // 3. Atualiza APENAS as partidas críticas (e não o banco todo)
+    for (const jogoBanco of partidasCriticas) {
       const jogoApi = jogosDaApi.find((m: any) => m.id === jogoBanco.fixture_id)
+      
+      // Se a API não mandou o jogo de hoje (delay deles), a gente pula e tenta na próxima rodada do cron
       if (!jogoApi) continue
 
       let novoStatus = jogoBanco.status
@@ -64,7 +72,7 @@ export async function GET(req: NextRequest) {
       else if (jogoApi.status === 'IN_PLAY' || jogoApi.status === 'PAUSED') novoStatus = 'LIVE'
       else if (jogoApi.status === 'TIMED' || jogoApi.status === 'SCHEDULED') novoStatus = 'NS'
 
-      // Leitura robusta dos gols da API (garantindo que se vier vazio, preserva o banco)
+      // Leitura robusta dos gols da API
       const novosGolsCasa = jogoApi.score?.fullTime?.home ?? jogoBanco.gols_casa
       const novosGolsFora = jogoApi.score?.fullTime?.away ?? jogoBanco.gols_fora
 
@@ -72,7 +80,7 @@ export async function GET(req: NextRequest) {
         houveJogoFinalizado = true
       }
 
-      // Se algo mudou, envia para o banco
+      // Se algo mudou, envia o update
       if (
         jogoBanco.status !== novoStatus || 
         jogoBanco.gols_casa !== novosGolsCasa || 
@@ -87,14 +95,13 @@ export async function GET(req: NextRequest) {
           })
           .eq('id', jogoBanco.id)
 
-        // Se falhar de salvar a linha específica, avisa no log mas não derruba a aplicação
         if (updateError) {
           console.error(`Erro ao atualizar partida ${jogoBanco.id}:`, updateError)
         }
       }
     }
 
-    // 5. SE ALGUM JOGO ACABOU DE TERMINAR: Dispara o cálculo de ranking
+    // 4. SE ALGUM JOGO ACABOU DE TERMINAR: Dispara o cálculo de ranking
     if (houveJogoFinalizado) {
       try {
         const protocol = req.headers.get('x-forwarded-proto') || 'https'
@@ -108,6 +115,7 @@ export async function GET(req: NextRequest) {
           headers: {
             'x-admin-secret': process.env.ADMIN_SECRET!,
           },
+          cache: 'no-store'
         })
         
         if (!resProcessar.ok) {
@@ -115,8 +123,6 @@ export async function GET(req: NextRequest) {
           console.error('[Cron] Ocorreu um erro na rota processar-pontos:', erroTexto)
         }
       } catch (internalErr) {
-        // Se a chamada de pontos falhar por timeout de rede ou URL maluca, 
-        // ele cai AQUI, e NÃO derruba o fato de que a partida já foi gravada como 'FT'.
         console.error('[Cron] Falha de conexão ao acionar processar-pontos:', internalErr)
       }
 
@@ -128,7 +134,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Placares sincronizados. Jogo continua LIVE.' 
+      message: 'Placares sincronizados. Monitoramento em andamento.' 
     })
 
   } catch (err: any) {
