@@ -18,6 +18,11 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
+  const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_SECRET_SUPABASE_KEY!
+  )
+
   let qtdBoloes = 0
   let valorPago = 0
 
@@ -68,15 +73,26 @@ export default async function DashboardPage() {
     .order('nome', { ascending: true })
     .limit(3000)
 
-  const { data: boloesRanking } = await supabase
-    .from('boloes')
-    .select('id, nome, user_id, pontuacao_total')
-    .order('pontuacao_total', { ascending: false })
+  const { data: pagantes } = await supabaseAdmin
+    .from('pagamentos_usuarios')
+    .select('user_id')
+    .gt('valor_pago', 0) // Exige que o valor pago seja estritamente maior que 0.00
 
-  const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_SECRET_SUPABASE_KEY!
-  )
+  // Cria um array só com os UUIDs de quem pagou (ex: ['id-1', 'id-2'])
+  const pagantesIds = pagantes?.map(p => p.user_id) || []
+
+  // 2. BUSCA O RANKING: Puxa os bolões apenas dos pagantes
+  let boloesRanking: any[] = []
+  
+  if (pagantesIds.length > 0) {
+    const { data } = await supabase
+      .from('boloes')
+      .select('id, nome, user_id, pontuacao_total')
+      .in('user_id', pagantesIds) // O pulo do gato: filtra os bolões cruzando com a lista acima
+      .order('pontuacao_total', { ascending: false })
+      
+    boloesRanking = data || []
+  } 
 
   // 1. Contorna a paginação do Supabase buscando lotes de 1000 usuários
   let listaUsuariosAuth: any[] = []
