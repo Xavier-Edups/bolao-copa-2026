@@ -320,7 +320,7 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
   return (
     <>
       {/* PAINEL PRINCIPAL (DASHBOARD) */}
-      <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl flex flex-col group hover:border-purple-500/20 transition-all">
+      <div className="bg-white/[0.02] border border-purple-600/70 rounded-3xl p-6 backdrop-blur-xl flex flex-col group transition-all">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <span>👁️</span> Tabela
