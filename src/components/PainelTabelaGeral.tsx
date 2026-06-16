@@ -76,22 +76,25 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
   // ==========================================
   useEffect(() => {
     const buscarPalpites = async () => {
-      if (!partidaSelecionada) {
+      if (!partidaSelecionada || !listaRanking || listaRanking.length === 0) {
         setPalpitesDaPartida([])
         return
       }
       setIsLoadingPalpites(true)
       try {
+        const idsValidos = listaRanking.map(r => r.id)
+
         const { data, error } = await supabase
           .from('palpites_jogos')
           .select('bolao_id, gols_casa, gols_fora')
           .eq('partida_id', partidaSelecionada.fixture_id)
+          .in('bolao_id', idsValidos)
 
         if (error) throw error
 
         if (data) {
           const palpitesComNomes = data.map((palpite) => {
-            const donoDoBolao = listaRanking?.find(r => String(r.id) === String(palpite.bolao_id))
+            const donoDoBolao = listaRanking.find(r => String(r.id) === String(palpite.bolao_id))
             return {
               ...palpite,
               nomeUsuario: donoDoBolao?.nomeUsuario || 'Usuário Desconhecido',
@@ -116,7 +119,7 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
   // ==========================================
   useEffect(() => {
     const buscarPalpitesDoGrupo = async () => {
-      if (!grupoSelecionado) {
+      if (!grupoSelecionado || !listaRanking || listaRanking.length === 0) {
         setPalpitesDoGrupo([])
         return
       }
@@ -124,11 +127,13 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
       try {
         const timesDoGrupo = times.filter(t => t.grupo === grupoSelecionado)
         const idsTimes = timesDoGrupo.map(t => t.id)
+        const idsValidos = listaRanking.map(r => r.id)
 
         const { data, error } = await supabase
           .from('palpites_grupos')
           .select('bolao_id, time_id, posicao')
           .in('time_id', idsTimes)
+          .in('bolao_id', idsValidos)
 
         if (error) throw error
 
@@ -140,7 +145,7 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
           })
 
           const listaFinal = Object.keys(agrupadoPorBolao).map(bolaoId => {
-            const dono = listaRanking?.find(r => String(r.id) === String(bolaoId))
+            const dono = listaRanking.find(r => String(r.id) === String(bolaoId))
             const palpitesOrdenados = agrupadoPorBolao[bolaoId].sort((a, b) => Number(a.posicao) - Number(b.posicao))
             
             const ordemDosPaises = palpitesOrdenados.map(p => {
@@ -178,18 +183,20 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
   // ==========================================
   useEffect(() => {
     const buscarMataMata = async () => {
-      if (!etapaMataAbertura) {
+      if (!etapaMataAbertura || !listaRanking || listaRanking.length === 0) {
         setPalpitesMata([])
         return
       }
       setIsLoadingMata(true)
       try {
         const fasesParaBuscar = etapaMataAbertura === 'final' ? ['campeao', 'vice'] : [etapaMataAbertura]
+        const idsValidos = listaRanking.map(r => r.id)
 
         const { data, error } = await supabase
           .from('palpites_matamata')
           .select('bolao_id, fase, time_id')
           .in('fase', fasesParaBuscar)
+          .in('bolao_id', idsValidos)
 
         if (error) throw error
 
@@ -204,7 +211,7 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
           })
 
           const listaFinal = Object.keys(agrupado).map(bolaoId => {
-            const dono = listaRanking?.find(r => String(r.id) === String(bolaoId))
+            const dono = listaRanking.find(r => String(r.id) === String(bolaoId))
             
             const timeCamp = times.find(t => String(t.id) === agrupado[bolaoId].campeao)
             const timeVice = times.find(t => String(t.id) === agrupado[bolaoId].vice)
@@ -242,11 +249,14 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
   // ==========================================
   useEffect(() => {
     const buscarPremios = async () => {
-      if (modalAberto !== 'premios') return
+      if (modalAberto !== 'premios' || !listaRanking || listaRanking.length === 0) {
+        setPalpitesPremios([])
+        return
+      }
       setIsLoadingPremios(true)
       try {
-        // O Supabase faz um JOIN automático pela Foreign Key.
-        // Se a sua tabela/coluna de jogadores for diferente, ajuste 'jogadores ( nome )'
+        const idsValidos = listaRanking.map(r => r.id)
+
         const { data, error } = await supabase
           .from('palpites_premios')
           .select(`
@@ -256,6 +266,7 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
             jogador_id,
             jogadores ( nome )
           `)
+          .in('bolao_id', idsValidos)
 
         if (error) throw error
 
@@ -285,7 +296,7 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
           })
 
           const listaFinal = Object.keys(agrupado).map(bolaoId => {
-            const dono = listaRanking?.find(r => String(r.id) === String(bolaoId))
+            const dono = listaRanking.find(r => String(r.id) === String(bolaoId))
             return {
               bolaoId,
               nomeUsuario: dono?.nomeUsuario || 'Usuário Desconhecido',
