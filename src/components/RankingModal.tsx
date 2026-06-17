@@ -36,7 +36,7 @@ export default function RankingModal({ isOpen, onClose, listaRanking, bolaoAtivo
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-2">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-2 bg-white/5">
           {listaRanking?.map((jogador) => {
             // Verifica se é o bolão do usuário logado OU se bate com algum ID ativo
             const isDestacado = jogador.isMeuBolao || String(jogador.id) === String(bolaoAtivoId)

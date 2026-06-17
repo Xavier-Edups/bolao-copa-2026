@@ -21,7 +21,7 @@ export default function PainelTabelaClient({ listaRanking, bolaoAtivoId }: Paine
 
   return (
     <>
-      <div className="bg-white/[0.02] border border-emerald-600 rounded-3xl p-6 backdrop-blur-xl flex flex-col group transition-all relative overflow-hidden">
+      <div className="bg-white/5 border border-emerald-600 rounded-3xl p-6 backdrop-blur-xl flex flex-col group transition-all relative overflow-hidden">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <span>👑</span> Ranking
@@ -64,7 +64,7 @@ export default function PainelTabelaClient({ listaRanking, bolaoAtivoId }: Paine
           onClick={() => setIsModalTabelaOpen(true)}
           className="mt-4 w-full py-3 rounded-xl font-bold text-sm transition-all border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white"
         >
-          Abrir Tabela
+          Abrir Ranking
         </button>
       </div>
 
