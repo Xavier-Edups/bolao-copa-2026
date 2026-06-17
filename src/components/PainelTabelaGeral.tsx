@@ -320,10 +320,10 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
   return (
     <>
       {/* PAINEL PRINCIPAL (DASHBOARD) */}
-      <div className="bg-white/[0.02] border border-purple-600/70 rounded-3xl p-6 backdrop-blur-xl flex flex-col group transition-all">
+      <div className="bg-white/5 border border-purple-600/70 rounded-3xl p-6 backdrop-blur-xl flex flex-col group transition-all">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <span>👁️</span> Tabela
+            <span>👁️</span> Tabela de Palpites
           </h2>
         </div>
 
@@ -364,12 +364,12 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
 
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-3">
               {partidas1f?.map((jogo) => (
-                <div key={jogo.id} className="flex flex-col sm:flex-row justify-between items-center bg-white/[0.03] p-4 rounded-2xl border border-white/5 hover:border-purple-500/20 transition-colors gap-4">
+                <div key={jogo.id} className="flex flex-col sm:flex-row justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5 hover:border-purple-500/20 transition-colors gap-4">
                   <div className="flex flex-col sm:flex-row items-center flex-1 w-full gap-3 sm:gap-0">
-                    <div className="flex items-center justify-center gap-1.5 text-[10px] sm:text-xs font-bold text-gray-500 shrink-0 leading-tight bg-white/5 px-3 py-1 sm:px-4 sm:py-1.5 rounded-full w-max whitespace-nowrap">
-                      <span>{formatarData(jogo.data_hora).split(' - ')[0]}</span>
+                    <div className="flex items-center justify-center gap-1.5 text-[10px] sm:text-xs font-bold text-gray-500 shrink-0 leading-tight bg-white/10 px-3 py-1 sm:px-4 sm:py-1.5 rounded-full w-max whitespace-nowrap">
+                      <span className="text-gray-400">{formatarData(jogo.data_hora).split(' - ')[0]}</span>
                       <span className="text-gray-600">•</span>
-                      <span className="text-gray-400">{formatarData(jogo.data_hora).split(' - ')[1]}</span>
+                      <span className="text-gray-300">{formatarData(jogo.data_hora).split(' - ')[1]}</span>
                     </div>
                     
                     <div className="flex flex-1 items-center justify-center gap-2 sm:gap-3 w-full px-1">
