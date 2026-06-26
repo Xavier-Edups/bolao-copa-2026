@@ -6,7 +6,7 @@ interface JogadorRanking {
   nomeBolao: string
   pontuacao_total: number
   posicaoReal: number 
-  isMeuBolao?: boolean // <-- NOVA PROPRIEDADE
+  isMeuBolao?: boolean
 }
 
 interface RankingModalProps {
@@ -38,38 +38,56 @@ export default function RankingModal({ isOpen, onClose, listaRanking, bolaoAtivo
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-2 bg-white/5">
           {listaRanking?.map((jogador) => {
-            // Verifica se é o bolão do usuário logado OU se bate com algum ID ativo
-            const isDestacado = jogador.isMeuBolao || String(jogador.id) === String(bolaoAtivoId)
+            const isMeu = jogador.isMeuBolao || String(jogador.id) === String(bolaoAtivoId)
+
+            // Hierarquia de Estilos: Pódio (Ouro/Prata/Bronze) -> Meu Bolão -> Padrão
+            let containerClasses = 'bg-black/40 border-white/5 hover:bg-white/[0.02]'
+            let nameColor = 'text-white'
+            let scoreColor = 'text-emerald-400'
+
+            if (jogador.posicaoReal === 1) {
+              containerClasses = 'bg-gradient-to-r from-amber-500/25 via-yellow-500/10 to-transparent border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.15)] scale-[1.01] z-10'
+              nameColor = 'text-amber-300'
+              scoreColor = 'text-amber-400'
+            } else if (jogador.posicaoReal === 2) {
+              containerClasses = 'bg-gradient-to-r from-slate-400/25 via-gray-400/10 to-transparent border-slate-400/50 shadow-[0_0_15px_rgba(148,163,184,0.15)] scale-[1.01] z-10'
+              nameColor = 'text-slate-200'
+              scoreColor = 'text-slate-300'
+            } else if (jogador.posicaoReal === 3) {
+              containerClasses = 'bg-gradient-to-r from-amber-700/35 via-orange-800/10 to-transparent border-amber-700/50 shadow-[0_0_15px_rgba(180,83,9,0.15)] scale-[1.01] z-10'
+              nameColor = 'text-orange-400'
+              scoreColor = 'text-orange-400'
+            } else if (isMeu) {
+              containerClasses = 'bg-gradient-to-r from-emerald-600/20 to-teal-500/10 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.15)] scale-[1.01] z-10'
+              nameColor = 'text-emerald-300'
+              scoreColor = 'text-emerald-400'
+            }
 
             return (
               <div 
                 key={jogador.id} 
-                className={`flex justify-between items-center p-4 rounded-2xl border transition-all duration-300 ${
-                  isDestacado
-                    ? 'bg-gradient-to-r from-emerald-600/20 to-teal-500/10 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.15)] scale-[1.01] z-10' 
-                    : 'bg-black/40 border-white/5 hover:bg-white/[0.02]'
-                }`}
+                className={`flex justify-between items-center p-4 rounded-2xl border transition-all duration-300 ${containerClasses}`}
               >
                 <div className="flex items-center gap-4 min-w-0">
                   <div className="w-8 flex justify-center shrink-0">
-                    {jogador.posicaoReal === 1 ? <span className="text-2xl drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]">🥇</span> :
-                     jogador.posicaoReal === 2 ? <span className="text-2xl drop-shadow-[0_0_10px_rgba(156,163,175,0.5)]">🥈</span> :
-                     jogador.posicaoReal === 3 ? <span className="text-2xl drop-shadow-[0_0_10px_rgba(180,83,9,0.5)]">🥉</span> :
-                     <span className={`font-black text-lg ${isDestacado ? 'text-emerald-400' : 'text-gray-600'}`}>{jogador.posicaoReal}º</span>}
+                    {jogador.posicaoReal === 1 ? <span className="text-2xl drop-shadow-[0_0_10px_rgba(251,191,36,0.6)]">🥇</span> :
+                     jogador.posicaoReal === 2 ? <span className="text-2xl drop-shadow-[0_0_10px_rgba(156,163,175,0.6)]">🥈</span> :
+                     jogador.posicaoReal === 3 ? <span className="text-2xl drop-shadow-[0_0_10px_rgba(180,83,9,0.6)]">🥉</span> :
+                     <span className={`font-black text-lg ${isMeu ? 'text-emerald-400' : 'text-gray-600'}`}>{jogador.posicaoReal}º</span>}
                   </div>
 
                   <div className="flex flex-col truncate">
-                    <span className={`font-bold text-sm sm:text-base truncate ${isDestacado ? 'text-emerald-300' : 'text-white'}`}>
+                    <span className={`font-bold text-sm sm:text-base truncate ${nameColor}`}>
                       {jogador.nomeUsuario}
                     </span>
-                    <span className="text-xs text-gray-500 uppercase tracking-wider truncate">
+                    <span className="text-xs text-gray-500 uppercase tracking-wider truncate mt-0.5">
                       {jogador.nomeBolao}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex flex-col items-end shrink-0 ml-4">
-                  <span className="font-black text-emerald-400 text-lg sm:text-xl leading-none">
+                  <span className={`font-black text-lg sm:text-xl leading-none ${scoreColor}`}>
                     {jogador.pontuacao_total}
                   </span>
                   <span className="text-[10px] uppercase font-bold text-gray-500 mt-1 tracking-widest">
