@@ -81,6 +81,17 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
     return () => clearInterval(interval)
   }, []) // Array vazio: roda apenas 1 vez quando a tela abre
 
+  const verificarBloqueioPartida = (dataHoraPartida: string) => {
+    // Se a partida não tem data (ex: 'TBD'), bloqueia por segurança
+    if (!dataHoraPartida || dataHoraPartida === 'TBD') return true;
+
+    const horaJogo = new Date(dataHoraPartida).getTime();
+    const horaAtual = new Date().getTime();
+    
+    // Retorna TRUE se faltar menos de 30 minutos (1800000 ms) ou se já passou
+    return (horaJogo - horaAtual) <= 1800000;
+  }
+
 
   // =========================================================
   // EFFECT 2: Carregamento dos Dados do Supabase
@@ -191,7 +202,7 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
     carregarDadosSalvos()
   }, [partidas1f, jogadores])
   
-    const handleSalvarBolao = async () => {
+   const handleSalvarBolao = async () => {
     if (!bolaoAtivo) return
     setIsSaving(true)
 
@@ -209,7 +220,6 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
         return
       }
 
-      // Faz um Upsert (Cria se não existir, atualiza se já existir) na tabela de bolões
       const { error: erroBolao } = await supabase
         .from('boloes')
         .upsert({
@@ -221,20 +231,24 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
       if (erroBolao) throw erroBolao
 
       // ==========================================
-      // 1. EMPACOTANDO OS DADOS
+      // 1. PREPARANDO OS JOGOS (Trava Inteligente)
       // ==========================================
-
-      // A) Jogos (1ª e 2ª Fase unidas)
       const p1 = palpites1aFase[bolaoId] || {}
       const p2 = palpites2aFase[bolaoId] || {}
       const jogosParaSalvar: any[] = []
       const todasAsPartidas = [...partidas1f, ...partidas2f]
       
+      // MÁGICA: Descobre EXATAMENTE quais jogos estão desbloqueados agora
+      const partidasDesbloqueadasIds = todasAsPartidas
+        .filter(j => !verificarBloqueioPartida(j.data_hora))
+        .map(j => j.fixture_id)
+
       ;[...Object.entries(p1), ...Object.entries(p2)].forEach(([partidaId, placar]) => {
         if (placar.casa !== '' && placar.fora !== '') {
-          // Pega o número real (fixture_id) em vez do UUID para o banco não recusar
           const jogoOriginal = todasAsPartidas.find(j => j.id === partidaId)
-          if (jogoOriginal) {
+          
+          // SÓ INCLUI NA LISTA DE SALVAMENTO SE ESTIVER DESBLOQUEADO
+          if (jogoOriginal && partidasDesbloqueadasIds.includes(jogoOriginal.fixture_id)) {
             jogosParaSalvar.push({
               bolao_id: bolaoId,
               partida_id: jogoOriginal.fixture_id, 
@@ -245,73 +259,81 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
         }
       })
 
-      // B) Classificação dos Grupos
-      const pGrupos = palpitesGrupos[bolaoId] || {}
-      const gruposParaSalvar = Object.entries(pGrupos)
-        .filter(([_, posicao]) => posicao !== '')
-        .map(([timeId, posicao]) => ({
-          bolao_id: bolaoId,
-          time_id: parseInt(timeId),
-          posicao: parseInt(posicao as string)
-        }))
+      // ==========================================
+      // 2. EXECUTANDO NO SUPABASE (COM PROTEÇÃO DE HISTÓRICO)
+      // ==========================================
 
-      // C) Mata-Mata (Funil)
-      const pMata = palpitesMataMata[bolaoId] || { r32: {}, r16: {}, qf: {}, sf: {}, campeao: '', vice: '' }
-      const mataMataParaSalvar: any[] = []
-      const fasesArr = ['r32', 'r16', 'qf', 'sf'] as const
-      
-      fasesArr.forEach(fase => {
-        Object.entries(pMata[fase]).forEach(([index, timeId]) => {
-          if (timeId) mataMataParaSalvar.push({ bolao_id: bolaoId, fase: fase, posicao_index: parseInt(index), time_id: parseInt(timeId) })
-        })
-      })
-      if (pMata.campeao) mataMataParaSalvar.push({ bolao_id: bolaoId, fase: 'campeao', posicao_index: 0, time_id: parseInt(pMata.campeao) })
-      if (pMata.vice) mataMataParaSalvar.push({ bolao_id: bolaoId, fase: 'vice', posicao_index: 0, time_id: parseInt(pMata.vice) })
+      // A) ATUALIZA APENAS OS JOGOS LIBERADOS
+      if (partidasDesbloqueadasIds.length > 0) {
+        // Deleta APENAS os jogos desbloqueados (mantém o histórico antigo intacto e seguro!)
+        await supabase
+          .from('palpites_jogos')
+          .delete()
+          .eq('bolao_id', bolaoId)
+          .in('partida_id', partidasDesbloqueadasIds)
+          .throwOnError()
 
-      // D) Prêmios Individuais
-      const pPremios = palpitesPremios[bolaoId] || {}
-      const premiosParaSalvar: any[] = []
-      const chavesPremios = ['bolaDeOuro', 'chuteiraDeOuro', 'luvaDeOuro'] as const
-      
-      chavesPremios.forEach(premio => {
-        const p = pPremios[premio]
-        if (p && p.timeId && p.jogador) {
-          // Busca o ID do jogador baseado no nome que estava no Select
-          const jogadorObj = jogadores.find(j => j.nome === p.jogador && j.time_id.toString() === p.timeId)
-          if (jogadorObj) {
-            premiosParaSalvar.push({
-              bolao_id: bolaoId,
-              premio: premio,
-              time_id: parseInt(p.timeId),
-              jogador_id: jogadorObj.id
-            })
-          }
+        // Insere os novos palpites apenas desses jogos abertos
+        if (jogosParaSalvar.length > 0) {
+          await supabase.from('palpites_jogos').insert(jogosParaSalvar).throwOnError()
         }
-      })
+      }
 
-      // ==========================================
-      // 2. EXECUTANDO NO SUPABASE (Com trava anti-falha silenciosa)
-      // ==========================================
+      // B) ATUALIZA AS OUTRAS ABAS (SÓ SE AS INSCRIÇÕES GLOBAIS AINDA ESTIVEREM ABERTAS)
+      // Como o prazo (11/06) já passou, este bloco será ignorado e não vai mexer em nada!
+      if (!isInscricoesEncerradas) {
+        // Classificação dos Grupos
+        const pGrupos = palpitesGrupos[bolaoId] || {}
+        const gruposParaSalvar = Object.entries(pGrupos)
+          .filter(([_, posicao]) => posicao !== '')
+          .map(([timeId, posicao]) => ({
+            bolao_id: bolaoId, time_id: parseInt(timeId), posicao: parseInt(posicao as string)
+          }))
 
-      // O .throwOnError() obriga o Supabase a parar e mostrar o erro no catch!
-      await Promise.all([
-        supabase.from('palpites_jogos').delete().eq('bolao_id', bolaoId).throwOnError(),
-        supabase.from('palpites_grupos').delete().eq('bolao_id', bolaoId).throwOnError(),
-        supabase.from('palpites_matamata').delete().eq('bolao_id', bolaoId).throwOnError(),
-        supabase.from('palpites_premios').delete().eq('bolao_id', bolaoId).throwOnError()
-      ])
+        // Mata-Mata
+        const pMata = palpitesMataMata[bolaoId] || { r32: {}, r16: {}, qf: {}, sf: {}, campeao: '', vice: '' }
+        const mataMataParaSalvar: any[] = []
+        const fasesArr = ['r32', 'r16', 'qf', 'sf'] as const
+        
+        fasesArr.forEach(fase => {
+          Object.entries(pMata[fase]).forEach(([index, timeId]) => {
+            if (timeId) mataMataParaSalvar.push({ bolao_id: bolaoId, fase: fase, posicao_index: parseInt(index), time_id: parseInt(timeId) })
+          })
+        })
+        if (pMata.campeao) mataMataParaSalvar.push({ bolao_id: bolaoId, fase: 'campeao', posicao_index: 0, time_id: parseInt(pMata.campeao) })
+        if (pMata.vice) mataMataParaSalvar.push({ bolao_id: bolaoId, fase: 'vice', posicao_index: 0, time_id: parseInt(pMata.vice) })
 
-      // Insere as listas novas
-      const promessasInsert: any[] = []
-      if (jogosParaSalvar.length > 0) promessasInsert.push(supabase.from('palpites_jogos').insert(jogosParaSalvar).throwOnError())
-      if (gruposParaSalvar.length > 0) promessasInsert.push(supabase.from('palpites_grupos').insert(gruposParaSalvar).throwOnError())
-      if (mataMataParaSalvar.length > 0) promessasInsert.push(supabase.from('palpites_matamata').insert(mataMataParaSalvar).throwOnError())
-      if (premiosParaSalvar.length > 0) promessasInsert.push(supabase.from('palpites_premios').insert(premiosParaSalvar).throwOnError())
+        // Prêmios Individuais
+        const pPremios = palpitesPremios[bolaoId] || {}
+        const premiosParaSalvar: any[] = []
+        const chavesPremios = ['bolaDeOuro', 'chuteiraDeOuro', 'luvaDeOuro'] as const
+        
+        chavesPremios.forEach(premio => {
+          const p = pPremios[premio]
+          if (p && p.timeId && p.jogador) {
+            const jogadorObj = jogadores.find(j => j.nome === p.jogador && j.time_id.toString() === p.timeId)
+            if (jogadorObj) {
+              premiosParaSalvar.push({ bolao_id: bolaoId, premio: premio, time_id: parseInt(p.timeId), jogador_id: jogadorObj.id })
+            }
+          }
+        })
 
-      await Promise.all(promessasInsert)
+        // Deleta os antigos e insere os novos
+        await Promise.all([
+          supabase.from('palpites_grupos').delete().eq('bolao_id', bolaoId).throwOnError(),
+          supabase.from('palpites_matamata').delete().eq('bolao_id', bolaoId).throwOnError(),
+          supabase.from('palpites_premios').delete().eq('bolao_id', bolaoId).throwOnError()
+        ])
 
-      // Sucesso!
-      //alert('Palpites salvos com sucesso na nuvem! 🏆')
+        const promessasInsertExtra: any[] = []
+        if (gruposParaSalvar.length > 0) promessasInsertExtra.push(supabase.from('palpites_grupos').insert(gruposParaSalvar).throwOnError())
+        if (mataMataParaSalvar.length > 0) promessasInsertExtra.push(supabase.from('palpites_matamata').insert(mataMataParaSalvar).throwOnError())
+        if (premiosParaSalvar.length > 0) promessasInsertExtra.push(supabase.from('palpites_premios').insert(premiosParaSalvar).throwOnError())
+        
+        await Promise.all(promessasInsertExtra)
+      }
+
+      // Fecha o Modal e reseta o bolão ativo
       setBolaoAtivo(null) 
       
     } catch (error) {
@@ -320,7 +342,7 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
     } finally {
       setIsSaving(false)
     }
-  }
+  } 
 
   const handleFecharBolao = async () => {
     setBolaoAtivo(null)
@@ -750,7 +772,7 @@ const handleAbrirBolao = (bolao: Bolao) => {
 
               {/* Botão Fechar/Salvar (Ancorado à direita, não encolhe) */}
               <button 
-                onClick={isInscricoesEncerradas ? handleFecharBolao : handleSalvarBolao}
+                onClick={handleSalvarBolao}
                 disabled={isSaving}
                 className={`shrink-0 px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all border border-white/10 ${
                   isSaving 
@@ -900,7 +922,7 @@ const handleAbrirBolao = (bolao: Bolao) => {
               )}
 
               {/* ======================================= */}
-              {/* ABA 2A FASE (NÃO BLOQUEADA AINDA) */}
+              {/* ABA 2A FASE (BLOQUEIO INTELIGENTE) */}
               {/* ======================================= */}
               {abaAtiva === '2a_fase' && (
                 <div className="animate-fade-in pb-8">
@@ -919,6 +941,9 @@ const handleAbrirBolao = (bolao: Bolao) => {
                       partidas2f.map((jogo) => {
                         const { diaMes, hora } = formatarData(jogo.data_hora)
                         const isIndefinido = jogo.time_casa === 'A Definir' || jogo.time_fora === 'A Definir'
+                        const palpiteCasa = palpites2aFase[bolaoAtivo.id]?.[jogo.id]?.casa ?? ''
+                        const palpiteFora = palpites2aFase[bolaoAtivo.id]?.[jogo.id]?.fora ?? ''
+                        const pontosGanhos = palpites2aFase[bolaoAtivo.id]?.[jogo.id]?.pontos ?? 0
 
                         return (
                           <div key={jogo.id} className={`flex items-center justify-between px-3 py-4 sm:px-6 border-b border-white/5 transition-colors ${isIndefinido ? 'opacity-80 bg-black/20' : 'hover:bg-white/[0.02]'}`}>
@@ -943,33 +968,60 @@ const handleAbrirBolao = (bolao: Bolao) => {
                                 </span>
                               </div>
 
-                              {isIndefinido ? (
-                                <div className="flex items-center justify-center shrink-0 w-20 sm:w-auto bg-black/60 border border-white/10 rounded-lg sm:rounded-xl px-2 sm:px-4 py-1.5 sm:py-2.5 shadow-inner">
-                                  <span className="text-xs sm:text-sm mr-1 sm:mr-1.5">🔒</span>
-                                </div>
-                              ) : (
+                              <div className="flex flex-col items-center justify-center shrink-0">
                                 <div className="flex items-center gap-1 sm:gap-4 shrink-0">
-                                  <input 
-                                    type="text" 
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    maxLength={2}
-                                    value={palpites2aFase[bolaoAtivo.id]?.[jogo.id]?.casa ?? ''}
-                                    onChange={(e) => handlePalpite2aFase(jogo.id, 'casa', e.target.value)}
-                                    className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black/60 border border-white/10 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
-                                  />
-                                  <span className="text-gray-500 font-bold text-xs sm:text-sm">X</span>
-                                  <input 
-                                    type="text" 
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    maxLength={2}
-                                    value={palpites2aFase[bolaoAtivo.id]?.[jogo.id]?.fora ?? ''}
-                                    onChange={(e) => handlePalpite2aFase(jogo.id, 'fora', e.target.value)}
-                                    className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black/60 border border-white/10 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
-                                  />
+                                  {/* TRAVA DINÂMICA: Verifica se já finalizou, se está rolando (LIVE), ou se faltam < 60 min */}
+                                  {jogo.status === 'FT' || jogo.status === 'LIVE' || verificarBloqueioPartida(jogo.data_hora) ? (
+                                    <>
+                                      <div className={`w-8 h-10 sm:w-12 sm:h-14 flex items-center justify-center border rounded-lg sm:rounded-xl text-base sm:text-xl font-black shadow-inner ${jogo.status === 'FT' ? 'bg-black/80 border-white/5 text-gray-400' : 'bg-black/50 border-white/10 text-white'}`}>
+                                        {palpiteCasa !== '' ? palpiteCasa : '-'}
+                                      </div>
+                                      <span className="text-gray-600 font-bold text-xs sm:text-sm">X</span>
+                                      <div className={`w-8 h-10 sm:w-12 sm:h-14 flex items-center justify-center border rounded-lg sm:rounded-xl text-base sm:text-xl font-black shadow-inner ${jogo.status === 'FT' ? 'bg-black/80 border-white/5 text-gray-400' : 'bg-black/50 border-white/10 text-white'}`}>
+                                        {palpiteFora !== '' ? palpiteFora : '-'}
+                                      </div>
+                                    </>
+                                  ) : isIndefinido ? ( 
+                                    <div className="flex items-center justify-center w-20 sm:w-28 bg-black/60 border border-white/10 rounded-lg sm:rounded-xl px-2 sm:px-4 py-1.5 sm:py-2.5 shadow-inner">
+                                      <span className="text-xs sm:text-sm mr-1 sm:mr-1.5">🔒</span>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <input 
+                                        type="text" 
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        maxLength={2}
+                                        value={palpiteCasa}
+                                        onChange={(e) => handlePalpite2aFase(jogo.id, 'casa', e.target.value)}
+                                        className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black/60 border border-white/10 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
+                                      />
+                                      <span className="text-gray-500 font-bold text-xs sm:text-sm">X</span>
+                                      <input 
+                                        type="text" 
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        maxLength={2}
+                                        value={palpiteFora}
+                                        onChange={(e) => handlePalpite2aFase(jogo.id, 'fora', e.target.value)}
+                                        className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black/60 border border-white/10 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
+                                      />
+                                    </>
+                                  )}
                                 </div>
-                              )}
+                                
+                                {/* PLACAR OFICIAL (Aparece centralizado embaixo apenas quando finalizado) */}
+                                {jogo.status === 'FT' && (
+                                  <div className="mt-1 sm:mt-1.5 flex flex-col items-center leading-none">
+                                    <span className="font-black text-[10px] sm:text-xs text-gray-300 tracking-[0.15em]">
+                                      {jogo.gols_casa} x {jogo.gols_fora}
+                                    </span>
+                                    <span className="text-[7px] sm:text-[8px] uppercase tracking-widest text-gray-500 mt-1">
+                                      Oficial
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
 
                               <div className="flex flex-col items-center gap-1.5 w-16 sm:w-28 overflow-hidden shrink-0">
                                 {isIndefinido || !jogo.bandeira_fora ? (
@@ -987,9 +1039,23 @@ const handleAbrirBolao = (bolao: Bolao) => {
                             </div>
 
                             <div className="w-12 sm:w-16 flex items-center justify-center shrink-0">
-                              <span className="text-[9px] sm:text-[11px] font-bold text-teal-500/50 flex gap-1">
-                                <span className="text-amber-400/50">-</span> pts
-                              </span>
+                              {jogo.status === 'FT' ? (
+                                <div 
+                                  className={`flex items-baseline gap-0.5 px-2 py-1 rounded border font-black text-[10px] sm:text-xs transition-colors ${
+                                    pontosGanhos === '10' ? 'bg-amber-400/10 border-amber-400/30 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.25)]' :
+                                    pontosGanhos === '7'  ? 'bg-green-500/10 border-green-500/30 text-green-400 shadow-[0_0_8px_rgba(34,197,94,0.15)]' :
+                                    pontosGanhos === '5'  ? 'bg-white/10 border-white/20 text-white shadow-[0_0_8px_rgba(255,255,255,0.1)]' :
+                                    pontosGanhos === '2'  ? 'bg-orange-500/10 border-orange-500/30 text-orange-500 shadow-[0_0_8px_rgba(253,224,71,0.1)]' :
+                                    'bg-red-500/10 border-red-500/30 text-red-500 shadow-[0_0_8px_rgba(239,68,68,0.15)]'
+                                  }`}
+                                >
+                                  {pontosGanhos} <span className="text-[8px] font-normal opacity-70">pts</span>
+                                </div>
+                              ) : (
+                                <span className="text-[9px] sm:text-[11px] font-bold text-teal-500/50 flex gap-1">
+                                  <span className="text-amber-400/50">-</span> pts
+                                </span>
+                              )}
                             </div>
 
                           </div>
@@ -998,7 +1064,7 @@ const handleAbrirBolao = (bolao: Bolao) => {
                     )}
                   </div>
                 </div>
-              )}
+              )} 
 
               {/* ======================================= */}
               {/* ABA GRUPOS (BLOQUEIA APÓS O PRAZO) */}
