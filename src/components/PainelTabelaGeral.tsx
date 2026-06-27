@@ -6,6 +6,9 @@ import { createClient } from '@/utils/supabase/client'
 interface Partida {
   id: string
   fixture_id: number
+  status: string
+  gols_casa: number | null
+  gols_fora: number | null
   time_casa: string
   time_fora: string
   bandeira_casa: string
@@ -372,17 +375,99 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
                       <span className="text-gray-300">{formatarData(jogo.data_hora).split(' - ')[1]}</span>
                     </div>
                     
-                    <div className="flex flex-1 items-center justify-center gap-2 sm:gap-3 w-full px-1">
-                      <div className="flex flex-1 items-center gap-2 justify-end">
-                        <span className="font-bold text-white text-xs sm:text-sm text-right leading-tight break-words">{jogo.time_casa}</span>
+                    {/* CONTAINER GRID GARANTE CENTRO ABSOLUTO */}
+                    <div className="grid grid-cols-[1fr_auto_1fr] flex-1 items-center w-full gap-2 sm:gap-3 px-1">
+                      
+                      {/* TIME DA CASA */}
+                      <div className="flex items-center gap-2 justify-end min-w-0">
+                        <span className="font-bold text-white text-xs sm:text-sm text-right leading-tight line-clamp-2">{jogo.time_casa}</span>
                         <img src={jogo.bandeira_casa} alt={jogo.time_casa} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover shrink-0" />
                       </div>
-                      <span className="text-gray-600 font-black text-xs shrink-0 mx-1">X</span>
-                      <div className="flex flex-1 items-center gap-2 justify-start">
+                      
+                      {/* PLACAR OFICIAL OU "X" */}
+                      <div className="flex items-center justify-center shrink-0 mx-1">
+                        {(jogo.status === 'FT' || jogo.status === 'LIVE') && jogo.gols_casa !== null ? (
+                          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-lg">
+                            <span className="text-emerald-400 font-black text-sm sm:text-base leading-none">{jogo.gols_casa}</span>
+                            <span className="text-emerald-600/50 text-[10px] leading-none">x</span>
+                            <span className="text-emerald-400 font-black text-sm sm:text-base leading-none">{jogo.gols_fora}</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-600 font-black text-xs">X</span>
+                        )}
+                      </div>
+
+                      {/* TIME DE FORA */}
+                      <div className="flex items-center gap-2 justify-start min-w-0">
                         <img src={jogo.bandeira_fora} alt={jogo.time_fora} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover shrink-0" />
-                        <span className="font-bold text-white text-xs sm:text-sm text-left leading-tight break-words">{jogo.time_fora}</span>
+                        <span className="font-bold text-white text-xs sm:text-sm text-left leading-tight line-clamp-2">{jogo.time_fora}</span>
                       </div>
                     </div>
+
+                    <div className="hidden sm:block w-16 shrink-0"></div>
+                  </div>
+
+                  <button onClick={() => setPartidaSelecionada(jogo)} className="w-full sm:w-auto px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shrink-0">
+                    Ver Palpites
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1: LISTA DE JOGOS DA 1ª FASE */}
+      {modalAberto === '1a_fase' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-3xl h-[85vh] flex flex-col rounded-3xl shadow-2xl overflow-hidden relative">
+            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-black/40 shrink-0">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-purple-400">Palpites da Galera</span>
+                <h3 className="text-xl font-black text-white uppercase mt-1">Jogos da 1ª Fase</h3>
+              </div>
+              <button onClick={() => setModalAberto(null)} className="px-4 py-2 rounded-xl text-sm font-bold border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300">
+                Fechar
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-3">
+              {partidas1f?.map((jogo) => (
+                <div key={jogo.id} className="flex flex-col sm:flex-row justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5 hover:border-purple-500/20 transition-colors gap-4">
+                  <div className="flex flex-col sm:flex-row items-center flex-1 w-full gap-3 sm:gap-0">
+                    <div className="flex items-center justify-center gap-1.5 text-[10px] sm:text-xs font-bold text-gray-500 shrink-0 leading-tight bg-white/10 px-3 py-1 sm:px-4 sm:py-1.5 rounded-full w-max whitespace-nowrap">
+                      <span className="text-gray-400">{formatarData(jogo.data_hora).split(' - ')[0]}</span>
+                      <span className="text-gray-600">•</span>
+                      <span className="text-gray-300">{formatarData(jogo.data_hora).split(' - ')[1]}</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-[1fr_auto_1fr] flex-1 items-center w-full gap-2 sm:gap-3 px-1">
+                      <div className="flex items-center gap-2 justify-end min-w-0">
+                        <span className="font-bold text-white text-xs sm:text-sm text-right leading-tight line-clamp-2">{jogo.time_casa}</span>
+                        <img src={jogo.bandeira_casa} alt={jogo.time_casa} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover shrink-0" />
+                      </div>
+                      
+                      {/* PLACAR TRAVADO MILIMETRICAMENTE */}
+                      <div className="flex items-center justify-center shrink-0 mx-1">
+                        {(jogo.status === 'FT' || jogo.status === 'LIVE') && jogo.gols_casa !== null ? (
+                          <div className="w-16 sm:w-20 h-7 sm:h-8 flex items-center justify-center bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-1 tabular-nums">
+                            <span className="flex-1 text-right text-emerald-400 font-black text-sm sm:text-base leading-none">{jogo.gols_casa}</span>
+                            <span className="w-4 text-center text-emerald-600/50 text-[10px] leading-none shrink-0">x</span>
+                            <span className="flex-1 text-left text-emerald-400 font-black text-sm sm:text-base leading-none">{jogo.gols_fora}</span>
+                          </div>
+                        ) : (
+                          <div className="w-16 sm:w-20 h-7 sm:h-8 flex items-center justify-center">
+                            <span className="text-gray-600 font-black text-xs">X</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 justify-start min-w-0">
+                        <img src={jogo.bandeira_fora} alt={jogo.time_fora} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover shrink-0" />
+                        <span className="font-bold text-white text-xs sm:text-sm text-left leading-tight line-clamp-2">{jogo.time_fora}</span>
+                      </div>
+                    </div>
+
                     <div className="hidden sm:block w-16 shrink-0"></div>
                   </div>
 
@@ -403,30 +488,36 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
             <div className="p-6 border-b border-white/5 flex flex-col items-center bg-gradient-to-b from-purple-900/20 to-transparent relative">
               <button onClick={() => setPartidaSelecionada(null)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-gray-400">✕</button>
               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">{formatarData(partidaSelecionada.data_hora)}</span>
-            {/* CABEÇALHO DO JOGO CENTRALIZADO À PROVA DE FALHAS */}
-              <div className="flex items-start justify-center w-full max-w-md mx-auto px-2 mt-2">
-                
-                {/* Time da Casa (Ganha exatos 50% do espaço restante) */}
-                <div className="flex flex-1 flex-col items-center gap-2">
-                  <img src={partidaSelecionada.bandeira_casa} alt={partidaSelecionada.time_casa} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full shadow-lg object-cover" />
-                  <span className="font-black text-white uppercase text-[10px] sm:text-xs tracking-wider text-center leading-tight break-words px-1">
+              
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center w-full max-w-md mx-auto px-2 mt-2">
+                <div className="flex flex-col items-center gap-2 min-w-0">
+                  <img src={partidaSelecionada.bandeira_casa} alt={partidaSelecionada.time_casa} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full shadow-lg object-cover shrink-0" />
+                  <span className="font-black text-white uppercase text-[10px] sm:text-xs tracking-wider text-center leading-tight line-clamp-2 px-1 w-full">
                     {partidaSelecionada.time_casa}
                   </span>
                 </div>
 
-                {/* O "X" travado no centro da tela */}
-                <span className="text-xl sm:text-2xl font-black text-gray-700 mx-3 sm:mx-6 shrink-0 mt-2">
-                  X
-                </span>
+                {/* PLACAR DO CABEÇALHO TRAVADO */}
+                <div className="flex items-center justify-center shrink-0 px-2 sm:px-4">
+                  {(partidaSelecionada.status === 'FT' || partidaSelecionada.status === 'LIVE') && partidaSelecionada.gols_casa !== null ? (
+                    <div className="w-24 sm:w-28 h-9 sm:h-10 flex items-center justify-center bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-2 tabular-nums shadow-inner">
+                      <span className="flex-1 text-right text-emerald-400 font-black text-xl sm:text-2xl leading-none">{partidaSelecionada.gols_casa}</span>
+                      <span className="w-5 text-center text-emerald-600/50 text-xs leading-none shrink-0">x</span>
+                      <span className="flex-1 text-left text-emerald-400 font-black text-xl sm:text-2xl leading-none">{partidaSelecionada.gols_fora}</span>
+                    </div>
+                  ) : (
+                    <div className="w-24 sm:w-28 h-9 sm:h-10 flex items-center justify-center">
+                      <span className="text-xl sm:text-2xl font-black text-gray-700">X</span>
+                    </div>
+                  )}
+                </div>
 
-                {/* Time de Fora (Ganha exatos 50% do espaço restante) */}
-                <div className="flex flex-1 flex-col items-center gap-2">
-                  <img src={partidaSelecionada.bandeira_fora} alt={partidaSelecionada.time_fora} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full shadow-lg object-cover" />
-                  <span className="font-black text-white uppercase text-[10px] sm:text-xs tracking-wider text-center leading-tight break-words px-1">
+                <div className="flex flex-col items-center gap-2 min-w-0">
+                  <img src={partidaSelecionada.bandeira_fora} alt={partidaSelecionada.time_fora} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full shadow-lg object-cover shrink-0" />
+                  <span className="font-black text-white uppercase text-[10px] sm:text-xs tracking-wider text-center leading-tight line-clamp-2 px-1 w-full">
                     {partidaSelecionada.time_fora}
                   </span>
                 </div>
-
               </div> 
             </div>
 
@@ -446,10 +537,12 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
                         <span className="text-sm font-bold text-gray-300 truncate">{palpite.nomeUsuario}</span>
                         <span className="text-[10px] text-gray-500 uppercase tracking-wider truncate">{palpite.nomeBolao}</span>
                       </div>
-                      <div className="flex items-center gap-2 bg-black/50 px-3 py-1.5 rounded-lg border border-white/5 shrink-0">
-                        <span className="text-purple-400 font-black text-base">{palpite.gols_casa}</span>
-                        <span className="text-gray-600 text-[10px]">x</span>
-                        <span className="text-purple-400 font-black text-base">{palpite.gols_fora}</span>
+                      
+                      {/* CAIXINHA ROXA DOS PALPITES TAMBÉM TRAVADA */}
+                      <div className="w-14 sm:w-16 h-7 sm:h-8 flex items-center justify-center bg-black/50 border border-white/5 rounded-lg shrink-0 px-1 tabular-nums">
+                        <span className="flex-1 text-right text-purple-400 font-black text-sm sm:text-base leading-none">{palpite.gols_casa}</span>
+                        <span className="w-3 text-center text-gray-600 text-[10px] leading-none shrink-0">x</span>
+                        <span className="flex-1 text-left text-purple-400 font-black text-sm sm:text-base leading-none">{palpite.gols_fora}</span>
                       </div>
                     </div>
                   ))
@@ -460,9 +553,7 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
         </div>
       )}
 
-     {/* ========================================== */}
       {/* MODAL 1B: LISTA DE JOGOS DA 2ª FASE (MATA-MATA) */}
-      {/* ========================================== */}
       {modalAberto === '2a_fase' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-fade-in">
           <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-3xl h-[85vh] flex flex-col rounded-3xl shadow-2xl overflow-hidden relative">
@@ -478,18 +569,12 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
 
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-3">
               {(() => {
-                // 1. Filtra a lista: Só permite jogos que tem times reais definidos.
-                // Ajuste as strings ('TBD', 'A Definir', etc) conforme o que sua API/banco salva quando não há time.
                 const jogosDefinidos = partidas2f?.filter(jogo => 
-                  jogo.time_casa && 
-                  jogo.time_fora && 
-                  jogo.time_casa !== 'TBD' && 
-                  jogo.time_fora !== 'TBD' &&
-                  jogo.time_casa !== 'A Definir' &&
-                  jogo.time_fora !== 'A Definir'
+                  jogo.time_casa && jogo.time_fora && 
+                  jogo.time_casa !== 'TBD' && jogo.time_fora !== 'TBD' &&
+                  jogo.time_casa !== 'A Definir' && jogo.time_fora !== 'A Definir'
                 ) || []
 
-                // 2. Se a lista filtrada estiver vazia, mostra a mensagem.
                 if (jogosDefinidos.length === 0) {
                   return (
                     <div className="flex flex-col items-center justify-center h-full py-20 text-center animate-fade-in">
@@ -497,14 +582,11 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
                         <span className="text-3xl grayscale opacity-50">⏳</span>
                       </div>
                       <h4 className="text-white font-black uppercase tracking-widest mb-2">Confrontos em Formação</h4>
-                      <p className="text-gray-500 text-sm max-w-sm">
-                        Os jogos desta fase aparecerão aqui assim que as seleções classificadas forem definidas oficialmente.
-                      </p>
+                      <p className="text-gray-500 text-sm max-w-sm">Os jogos desta fase aparecerão aqui assim que as seleções forem definidas.</p>
                     </div>
                   )
                 }
 
-                // 3. Se houver jogos definidos, renderiza a lista normalmente.
                 return jogosDefinidos.map((jogo) => (
                   <div key={jogo.id} className="flex flex-col sm:flex-row justify-between items-center bg-white/[0.03] p-4 rounded-2xl border border-white/5 hover:border-purple-500/20 transition-colors gap-4">
                     <div className="flex flex-col sm:flex-row items-center flex-1 w-full gap-3 sm:gap-0">
@@ -514,26 +596,33 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
                         <span className="text-gray-400">{formatarData(jogo.data_hora).split(' - ')[1]}</span>
                       </div>
                       
-                      <div className="flex flex-1 items-center justify-center gap-2 sm:gap-3 w-full px-1">
-                        <div className="flex flex-1 items-center gap-2 justify-end">
-                          <span className="font-bold text-white text-xs sm:text-sm text-right leading-tight break-words">{jogo.time_casa}</span>
-                          {/* Verifica se a bandeira existe antes de tentar carregar imagem quebrada */}
-                          {jogo.bandeira_casa ? (
-                             <img src={jogo.bandeira_casa} alt={jogo.time_casa} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover shrink-0" />
+                      <div className="grid grid-cols-[1fr_auto_1fr] flex-1 items-center w-full gap-2 sm:gap-3 px-1">
+                        <div className="flex items-center gap-2 justify-end min-w-0">
+                          <span className="font-bold text-white text-xs sm:text-sm text-right leading-tight line-clamp-2">{jogo.time_casa}</span>
+                          {jogo.bandeira_casa ? <img src={jogo.bandeira_casa} alt={jogo.time_casa} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover shrink-0" /> : <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/10 shrink-0"></div>}
+                        </div>
+                        
+                        {/* PLACAR TRAVADO MATA-MATA */}
+                        <div className="flex items-center justify-center shrink-0 mx-1">
+                          {(jogo.status === 'FT' || jogo.status === 'LIVE') && jogo.gols_casa !== null ? (
+                            <div className="w-16 sm:w-20 h-7 sm:h-8 flex items-center justify-center bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-1 tabular-nums">
+                              <span className="flex-1 text-right text-emerald-400 font-black text-sm sm:text-base leading-none">{jogo.gols_casa}</span>
+                              <span className="w-4 text-center text-emerald-600/50 text-[10px] leading-none shrink-0">x</span>
+                              <span className="flex-1 text-left text-emerald-400 font-black text-sm sm:text-base leading-none">{jogo.gols_fora}</span>
+                            </div>
                           ) : (
-                             <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/10 shrink-0"></div>
+                            <div className="w-16 sm:w-20 h-7 sm:h-8 flex items-center justify-center">
+                              <span className="text-gray-600 font-black text-xs">X</span>
+                            </div>
                           )}
                         </div>
-                        <span className="text-gray-600 font-black text-xs shrink-0 mx-1">X</span>
-                        <div className="flex flex-1 items-center gap-2 justify-start">
-                           {jogo.bandeira_fora ? (
-                             <img src={jogo.bandeira_fora} alt={jogo.time_fora} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover shrink-0" />
-                          ) : (
-                             <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/10 shrink-0"></div>
-                          )}
-                          <span className="font-bold text-white text-xs sm:text-sm text-left leading-tight break-words">{jogo.time_fora}</span>
+
+                        <div className="flex items-center gap-2 justify-start min-w-0">
+                          {jogo.bandeira_fora ? <img src={jogo.bandeira_fora} alt={jogo.time_fora} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover shrink-0" /> : <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/10 shrink-0"></div>}
+                          <span className="font-bold text-white text-xs sm:text-sm text-left leading-tight line-clamp-2">{jogo.time_fora}</span>
                         </div>
                       </div>
+
                       <div className="hidden sm:block w-16 shrink-0"></div>
                     </div>
 
