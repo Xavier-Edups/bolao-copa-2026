@@ -553,7 +553,9 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
         </div>
       )}
 
+      {/* ========================================== */}
       {/* MODAL 1B: LISTA DE JOGOS DA 2ª FASE (MATA-MATA) */}
+      {/* ========================================== */}
       {modalAberto === '2a_fase' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-fade-in">
           <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-3xl h-[85vh] flex flex-col rounded-3xl shadow-2xl overflow-hidden relative">
@@ -569,25 +571,37 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
 
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-3">
               {(() => {
-                const jogosDefinidos = partidas2f?.filter(jogo => 
-                  jogo.time_casa && jogo.time_fora && 
-                  jogo.time_casa !== 'TBD' && jogo.time_fora !== 'TBD' &&
-                  jogo.time_casa !== 'A Definir' && jogo.time_fora !== 'A Definir'
-                ) || []
+                const horaAtual = new Date().getTime();
 
-                if (jogosDefinidos.length === 0) {
+                // Filtra os jogos que têm times definidos E que já começaram (hora passou ou estão LIVE/FT)
+                const jogosLiberados = partidas2f?.filter(jogo => {
+                  const timesDefinidos = jogo.time_casa && jogo.time_fora && 
+                                         jogo.time_casa !== 'TBD' && jogo.time_fora !== 'TBD' &&
+                                         jogo.time_casa !== 'A Definir' && jogo.time_fora !== 'A Definir';
+                  
+                  const horaJogo = new Date(jogo.data_hora).getTime();
+                  const jogoComecou = (horaAtual >= horaJogo) || jogo.status === 'LIVE' || jogo.status === 'FT';
+
+                  return timesDefinidos && jogoComecou;
+                }) || []
+
+                // Se a lista estiver vazia, exibe a mensagem de espera
+                if (jogosLiberados.length === 0) {
                   return (
                     <div className="flex flex-col items-center justify-center h-full py-20 text-center animate-fade-in">
                       <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
-                        <span className="text-3xl grayscale opacity-50">⏳</span>
+                        <span className="text-3xl grayscale opacity-50">🤫</span>
                       </div>
-                      <h4 className="text-white font-black uppercase tracking-widest mb-2">Confrontos em Formação</h4>
-                      <p className="text-gray-500 text-sm max-w-sm">Os jogos desta fase aparecerão aqui assim que as seleções forem definidas.</p>
+                      <h4 className="text-white font-black uppercase tracking-widest mb-2">Palpites Ocultos</h4>
+                      <p className="text-gray-500 text-sm max-w-sm">
+                        Os palpites dos outros participantes aparecerão aqui assim que a bola rolar para cada partida.
+                      </p>
                     </div>
                   )
                 }
 
-                return jogosDefinidos.map((jogo) => (
+                // Renderiza apenas os jogos liberados
+                return jogosLiberados.map((jogo) => (
                   <div key={jogo.id} className="flex flex-col sm:flex-row justify-between items-center bg-white/[0.03] p-4 rounded-2xl border border-white/5 hover:border-purple-500/20 transition-colors gap-4">
                     <div className="flex flex-col sm:flex-row items-center flex-1 w-full gap-3 sm:gap-0">
                       <div className="flex items-center justify-center gap-1.5 text-[10px] sm:text-xs font-bold text-gray-500 shrink-0 leading-tight bg-white/5 px-3 py-1 sm:px-4 sm:py-1.5 rounded-full w-max whitespace-nowrap">
@@ -602,7 +616,7 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
                           {jogo.bandeira_casa ? <img src={jogo.bandeira_casa} alt={jogo.time_casa} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover shrink-0" /> : <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/10 shrink-0"></div>}
                         </div>
                         
-                        {/* PLACAR TRAVADO MATA-MATA */}
+                        {/* PLACAR OFICIAL NO MEIO */}
                         <div className="flex items-center justify-center shrink-0 mx-1">
                           {(jogo.status === 'FT' || jogo.status === 'LIVE') && jogo.gols_casa !== null ? (
                             <div className="w-16 sm:w-20 h-7 sm:h-8 flex items-center justify-center bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-1 tabular-nums">
@@ -626,9 +640,13 @@ export default function PainelTabelaGeral({ partidas1f, partidas2f, listaRanking
                       <div className="hidden sm:block w-16 shrink-0"></div>
                     </div>
 
-                    <button onClick={() => setPartidaSelecionada(jogo)} className="w-full sm:w-auto px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shrink-0">
+                    <button 
+                      onClick={() => setPartidaSelecionada(jogo)} 
+                      className="w-full sm:w-auto px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shrink-0"
+                    >
                       Ver Palpites
                     </button>
+                    
                   </div>
                 ))
               })()}
