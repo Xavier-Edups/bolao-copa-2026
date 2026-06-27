@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 interface JogadorRanking {
   id: string
   nomeUsuario: string
@@ -17,30 +19,65 @@ interface RankingModalProps {
 }
 
 export default function RankingModal({ isOpen, onClose, listaRanking, bolaoAtivoId }: RankingModalProps) {
+  const [termoBusca, setTermoBusca] = useState('')
+
   if (!isOpen) return null
+
+  // Filtra estritamente pelo nome do participante
+  const listaFiltrada = listaRanking?.filter((jogador) => 
+    jogador.nomeUsuario.toLowerCase().includes(termoBusca.toLowerCase())
+  ) || []
+
+  const handleFechar = () => {
+    setTermoBusca('') 
+    onClose()
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/90 backdrop-blur-sm animate-fade-in">
       <div className="bg-[#0a0a0a] border-0 sm:border border-white/10 w-full sm:max-w-3xl h-full sm:h-[85vh] flex flex-col justify-between sm:rounded-3xl shadow-2xl relative overflow-hidden">
         
+        {/* CABEÇALHO */}
         <div className="p-4 sm:p-6 border-b border-white/5 flex justify-between items-center bg-black/40 backdrop-blur-md shrink-0">
           <div>
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-400">Ranking Geral</span>
             <h3 className="text-lg sm:text-xl font-black text-white uppercase mt-0.5">Classificação do Bolão</h3>
           </div>
           <button 
-            onClick={onClose}
+            onClick={handleFechar}
             className="px-4 py-2 rounded-xl text-sm font-bold transition-all border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white"
           >
             Fechar
           </button>
         </div>
 
+        {/* BARRA DE PESQUISA */}
+        <div className="p-4 sm:px-6 sm:py-3 bg-black/20 border-b border-white/5 shrink-0">
+          <div className="relative flex items-center">
+            <input 
+              type="text"
+              placeholder="Pesquisar participante..."
+              value={termoBusca}
+              onChange={(e) => setTermoBusca(e.target.value)}
+              className="w-full h-11 bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-emerald-500/50 focus:bg-black/40 transition-all font-medium"
+            />
+            {termoBusca && (
+              <button 
+                onClick={() => setTermoBusca('')}
+                className="absolute right-3.5 text-xs text-gray-400 hover:text-white bg-white/10 hover:bg-white/20 w-5 h-5 rounded-full flex items-center justify-center transition-colors"
+                title="Limpar pesquisa"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* LISTA DO RANKING */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-2 bg-white/5">
-          {listaRanking?.map((jogador) => {
+          {listaFiltrada.map((jogador) => {
             const isMeu = jogador.isMeuBolao || String(jogador.id) === String(bolaoAtivoId)
 
-            // Hierarquia de Estilos: Pódio (Ouro/Prata/Bronze) -> Meu Bolão -> Padrão
             let containerClasses = 'bg-black/40 border-white/5 hover:bg-white/[0.02]'
             let nameColor = 'text-white'
             let scoreColor = 'text-emerald-400'
@@ -98,9 +135,20 @@ export default function RankingModal({ isOpen, onClose, listaRanking, bolaoAtivo
             )
           })}
 
+          {/* ESTADO VAZIO 1: Banco realmente zerado */}
           {listaRanking?.length === 0 && (
             <div className="text-center text-gray-500 py-10 text-sm">
               Nenhum bolão encontrado.
+            </div>
+          )}
+
+          {/* ESTADO VAZIO 2: Digitou um nome que não existe */}
+          {listaRanking?.length > 0 && listaFiltrada.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+              <span className="text-3xl mb-2 grayscale opacity-40">🔎</span>
+              <p className="text-gray-400 text-sm">
+                Ninguém encontrado para <span className="text-white font-bold">"{termoBusca}"</span>.
+              </p>
             </div>
           )}
         </div>
