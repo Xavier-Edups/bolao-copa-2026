@@ -298,10 +298,18 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
         // Classificação dos Grupos
         const pGrupos = palpitesGrupos[bolaoId] || {}
         const gruposParaSalvar = Object.entries(pGrupos)
-          .filter(([_, posicao]) => posicao !== '')
-          .map(([timeId, posicao]) => ({
-            bolao_id: bolaoId, time_id: parseInt(timeId), posicao: parseInt(posicao as string)
-          }))
+          .filter(([_, item]) => {
+            const pos = typeof item === 'string' ? item : item?.posicao;
+            return pos !== undefined && pos !== '';
+          })
+          .map(([timeId, item]) => {
+            const pos = typeof item === 'string' ? item : item?.posicao;
+            return {
+              bolao_id: bolaoId, 
+              time_id: parseInt(timeId), 
+              posicao: parseInt(pos as string)
+            }
+          }) 
 
         // Mata-Mata
         const pMata = palpitesMataMata[bolaoId] || { r32: {}, r16: {}, qf: {}, sf: {}, campeao: '', vice: '' }
@@ -520,19 +528,31 @@ const handleAbrirBolao = (bolao: Bolao) => {
     if (!bolaoAtivo) return // Trava de segurança
 
     setPalpitesGrupos(prev => {
-      const palpitesDoBolao = prev[bolaoAtivo.id] || {} // Pega só os palpites deste bolão
-      
+      const palpitesDoBolao = prev[bolaoAtivo.id] || {}
+
+      // Se o usuário selecionou o tracinho "-", deleta o palpite daquele time
       if (!posicao) {
-        const newState = { ...palpitesDoBolao }
-        delete newState[timeId]
-        return { ...prev, [bolaoAtivo.id]: newState }
+        const { [timeId]: _, ...resto } = palpitesDoBolao
+        return {
+          ...prev,
+          [bolaoAtivo.id]: resto
+        }
       }
-      
-      return { 
-        ...prev, 
-        [bolaoAtivo.id]: { ...palpitesDoBolao, [timeId]: posicao } 
+
+      // Pega os pontos que já estavam lá (ou zera se for palpite novo) e atualiza a posição
+      const palpiteAnterior = palpitesDoBolao[timeId] || { posicao: '', pontos: 0 }
+
+      return {
+        ...prev,
+        [bolaoAtivo.id]: {
+          ...palpitesDoBolao,
+          [timeId]: {
+            ...palpiteAnterior,
+            posicao: posicao
+          }
+        }
       }
-    })
+    }) 
   }
 
   const handlePalpite2aFase = (partidaId: string, time: 'casa' | 'fora', valor: string) => {
@@ -621,7 +641,7 @@ const handleAbrirBolao = (bolao: Bolao) => {
 
     // 2. Verifica Grupos (Todos os times devem ter posição)
     const pGrupos = palpitesGrupos[bolaoId] || {}
-    const gruposPreenchidos = Object.values(pGrupos).filter(pos => pos !== '').length
+    const gruposPreenchidos = Object.values(pGrupos).filter(item => item && item.posicao !== '').length
     if (gruposPreenchidos < times.length) return false
 
     // 3. Verifica Mata-Mata (Funil completo)
@@ -1303,7 +1323,7 @@ const handleAbrirBolao = (bolao: Bolao) => {
 
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                                 {Array.from({ length: fase.count }).map((_, i) => {
-                                  const slotObj = state[fase.key][i] || ""
+                                  const slotObj: any = state[fase.key][i] || ""
                                   const valueAtual = typeof slotObj === 'string' ? slotObj : (slotObj.timeId || "")
                                   const pontosGanhos = typeof slotObj === 'string' ? 0 : (slotObj.pontos || 0)
                                   const acertou = pontosGanhos > 0
