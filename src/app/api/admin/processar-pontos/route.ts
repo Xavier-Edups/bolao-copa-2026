@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { calcularPontosPartida } from '@/utils/calculadoraPontos' 
-
-// PESOS DE PONTUAÇÃO (Fácil de calibrar)
-const PONTOS_ACERTO_GRUPO = 5;
-const PONTOS_ACERTO_R32 = 3;
+import { calcularPontosPartida } from '@/utils/calculadoraPontos' // Ajuste o caminho se necessário
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!, 
   process.env.NEXT_SECRET_SUPABASE_KEY!
 )
 
+// Função auxiliar de paginação para contornar o limite de 1000 linhas
 async function buscarTodosOsRegistros(tabela: string, filtros?: (query: any) => any) {
   let todosDados: any[] = []
   let de = 0
@@ -42,116 +39,198 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 1. Busca os bolões ativos
+    // 1. Busca todos os bolões ativos
     const boloes = await buscarTodosOsRegistros('boloes')
     if (!boloes || boloes.length === 0) return NextResponse.json({ message: 'Nenhum bolão ativo.' })
 
-    // 2. Busca todas as bases necessárias em paralelo para máxima velocidade
-    const [partidasFT, todasPartidas, timesCopa, palpitesJogos, palpitesGrupos, palpitesMata] = await Promise.all([
-      buscarTodosOsRegistros('partidas', (q) => q.eq('status', 'FT')),
+    // 2. Busca apenas as partidas que já terminaram (Full Time)
+    const partidasFT = await buscarTodosOsRegistros('partidas', (q) => q.eq('status', 'FT'))
+    if (!partidasFT || partidasFT.length === 0) {
+      return NextResponse.json({ message: 'Nenhuma partida finalizada para processar.' })
+    }
+
+    // 3. Busca os registros adicionais necessários para o novo cálculo
+    const [todasPartidas, timesCopa, todosPalpites, palpitesGrupos, palpitesMata] = await Promise.all([
       buscarTodosOsRegistros('partidas'),
       buscarTodosOsRegistros('times_copa'),
       buscarTodosOsRegistros('palpites_jogos'),
       buscarTodosOsRegistros('palpites_grupos'),
-      buscarTodosOsRegistros('palpites_matamata')
+      buscarTodosOsRegistros('palpites_matamata', (q) => q.eq('fase', 'r32'))
     ])
 
-    const rankingBoloes: Record<string, number> = {}
+    // Arrays para guardar as atualizações que enviaremos em lote pro banco
+    const palpitesAtualizados = []
+    const updatesGrupos = []
+    const updatesMata: any[] = []
+    
+    const rankingBoloes: Record<string, number> = {} // Dicionário para somar os pontos de cada bolão
+
+    // Inicializa todos os bolões com zero para a contagem
     boloes.forEach(b => rankingBoloes[b.id] = 0)
 
     // ========================================================================
-    // ETAPA A: CÁLCULO DE PARTIDAS FINALIZADAS (Mantido igual)
+    // 4. O CÁLCULO - ETAPA A: PLACARES DOS JOGOS (MANTIDO ORIGINAL)
     // ========================================================================
-    const updatesJogos = []
-    
     for (const jogo of partidasFT) {
-      const placarReal = { casa: Number(jogo.gols_casa), fora: Number(jogo.gols_fora) }
-      const palpitesDesteJogo = palpitesJogos.filter(p => p.partida_id === jogo.fixture_id || p.partida_id?.toString() === jogo.id?.toString())
+      const placarReal = { 
+        casa: Number(jogo.gols_casa), 
+        fora: Number(jogo.gols_fora) 
+      }
+
+      const palpitesDesteJogo = todosPalpites.filter(p => 
+        p.partida_id === jogo.fixture_id || p.partida_id?.toString() === jogo.id?.toString()
+      )
 
       for (const palpite of palpitesDesteJogo) {
-        if (palpite.gols_casa === null || palpite.gols_casa === '' || palpite.gols_fora === null || palpite.gols_fora === '') continue;
+        if (palpite.gols_casa === null || palpite.gols_casa === '' || palpite.gols_fora === null || palpite.gols_fora === '') {
+          continue;
+        }
 
-        const pontosGanhos = calcularPontosPartida({ casa: Number(palpite.gols_casa), fora: Number(palpite.gols_fora) }, placarReal)
-        if (rankingBoloes[palpite.bolao_id] !== undefined) rankingBoloes[palpite.bolao_id] += pontosGanhos
+        const placarUsuario = { 
+          casa: Number(palpite.gols_casa), 
+          fora: Number(palpite.gols_fora) 
+        }
 
-        updatesJogos.push({ ...palpite, pontos: pontosGanhos })
+        const pontosGanhos = calcularPontosPartida(placarUsuario, placarReal)
+
+        if (rankingBoloes[palpite.bolao_id] !== undefined) {
+          rankingBoloes[palpite.bolao_id] += pontosGanhos
+        }
+
+        palpitesAtualizados.push({
+          ...palpite,
+          pontos: pontosGanhos
+        })
       }
     }
 
     // ========================================================================
-    // ETAPA B: CÁLCULO DE COLOCAÇÕES DOS GRUPOS
+    // 4. O CÁLCULO - ETAPA B: COLOCAÇÃO DE GRUPOS (3 PTS POR ACERTO)
     // ========================================================================
-    const updatesGrupos = []
-    // Filtra apenas times onde você já preencheu a coluna 'colocacao' no banco
-    const timesComColocacaoDefinida = timesCopa.filter(t => t.colocacao !== null && t.colocacao !== undefined)
-
-    for (const time of timesComColocacaoDefinida) {
-      const palpitesDesteTime = palpitesGrupos.filter(p => p.time_id === time.id)
-
-      for (const palpite of palpitesDesteTime) {
-        // Se a posição que o cara palpitou for igual à colocação oficial do time
-        const pontosGanhos = Number(palpite.posicao) === Number(time.colocacao) ? PONTOS_ACERTO_GRUPO : 0;
-        
-        if (rankingBoloes[palpite.bolao_id] !== undefined) rankingBoloes[palpite.bolao_id] += pontosGanhos
-        updatesGrupos.push({ ...palpite, pontos: pontosGanhos })
+    const mapaTimesColocacao = new Map<number, number>()
+    timesCopa.forEach(t => {
+      if (t.colocacao !== null && t.colocacao !== undefined) {
+        mapaTimesColocacao.set(Number(t.id), Number(t.colocacao))
       }
-    }
-
-    // ========================================================================
-    // ETAPA C: CÁLCULO DE CLASSIFICADOS PARA AS ELIMINATÓRIAS (LAST_32)
-    // ========================================================================
-    const updatesMata = []
-    
-    // Descobre os nomes oficiais de todos os times que estão na fase LAST_32
-    const jogosR32 = todasPartidas.filter(p => p.fase === 'LAST_32')
-    const nomesClassificadosR32 = new Set<string>()
-    
-    jogosR32.forEach(j => {
-      if (j.time_casa && j.time_casa !== 'A Definir' && j.time_casa !== 'TBD') nomesClassificadosR32.add(j.time_casa)
-      if (j.time_fora && j.time_fora !== 'A Definir' && j.time_fora !== 'TBD') nomesClassificadosR32.add(j.time_fora)
     })
 
-    // Converte os nomes em IDs usando a tabela times_copa
-    const idsClassificadosR32 = timesCopa
-      .filter(t => nomesClassificadosR32.has(t.nome))
-      .map(t => t.id)
+    for (const palpite of palpitesGrupos) {
+      const colocacaoReal = mapaTimesColocacao.get(Number(palpite.time_id))
+      let pontosGanhos = 0
 
-    // Filtra os palpites da fase r32
-    const palpitesR32 = palpitesMata.filter(p => p.fase === 'r32')
+      if (colocacaoReal !== undefined) {
+        pontosGanhos = Number(palpite.posicao) === colocacaoReal ? 3 : 0
+      }
 
-    for (const palpite of palpitesR32) {
-      const acertouClassificado = idsClassificadosR32.includes(Number(palpite.time_id))
-      const pontosGanhos = acertouClassificado ? PONTOS_ACERTO_R32 : 0;
+      if (rankingBoloes[palpite.bolao_id] !== undefined) {
+        rankingBoloes[palpite.bolao_id] += pontosGanhos
+      }
 
-      if (rankingBoloes[palpite.bolao_id] !== undefined) rankingBoloes[palpite.bolao_id] += pontosGanhos
-      updatesMata.push({ ...palpite, pontos: pontosGanhos })
+      updatesGrupos.push({
+        ...palpite,
+        pontos: pontosGanhos
+      })
     }
 
     // ========================================================================
-    // 5. ATUALIZAÇÃO EM LOTE NO BANCO DE DADOS
+    // 4. O CÁLCULO - ETAPA C: SELEÇÕES CLASSIFICADAS PARA O MATA-MATA (LAST_32)
+    // Regra: 1 pt por acerto + bônus de 8 pts se gabaritar as 32 seleções
     // ========================================================================
-    const promessasUpsert = []
+    const jogosLAST32 = todasPartidas.filter(p => p.fase === 'LAST_32')
+    const nomesOficiaisLAST32 = new Set<string>()
 
-    if (updatesJogos.length > 0) promessasUpsert.push(supabaseAdmin.from('palpites_jogos').upsert(updatesJogos, { onConflict: 'id' }))
-    if (updatesGrupos.length > 0) promessasUpsert.push(supabaseAdmin.from('palpites_grupos').upsert(updatesGrupos, { onConflict: 'id' }))
-    if (updatesMata.length > 0) promessasUpsert.push(supabaseAdmin.from('palpites_matamata').upsert(updatesMata, { onConflict: 'id' }))
+    jogosLAST32.forEach(j => {
+      if (j.time_casa && j.time_casa !== 'A Definir' && j.time_casa !== 'TBD') nomesOficiaisLAST32.add(j.time_casa)
+      if (j.time_fora && j.time_fora !== 'A Definir' && j.time_fora !== 'TBD') nomesOficiaisLAST32.add(j.time_fora)
+    })
 
-    await Promise.all(promessasUpsert)
+    const idsOficiaisLAST32 = new Set(
+      timesCopa
+        .filter(t => nomesOficiaisLAST32.has(t.nome))
+        .map(t => Number(t.id))
+    )
 
-    // Atualiza o Ranking Geral dos Bolões
+    for (const bolao of boloes) {
+      const palpitesDesteBolao = palpitesMata.filter(p => p.bolao_id === bolao.id)
+      
+      let totalAcertos = 0
+      palpitesDesteBolao.forEach(p => {
+        if (idsOficiaisLAST32.has(Number(p.time_id))) {
+          totalAcertos++
+        }
+      })
+
+      const gabaritou = (totalAcertos === 32)
+      const bonusGabarito = gabaritou ? 8 : 0
+
+      palpitesDesteBolao.forEach((p, idx) => {
+        const acertou = idsOficiaisLAST32.has(Number(p.time_id))
+        let pontosDestePalpite = acertou ? 1 : 0
+
+        // Atribui o bônus de +8 na primeira linha de palpite caso tenha acertado todas as 32
+        if (acertou && idx === 0 && gabaritou) {
+          pontosDestePalpite += bonusGabarito
+        }
+
+        if (rankingBoloes[bolao.id] !== undefined) {
+          rankingBoloes[bolao.id] += pontosDestePalpite
+        }
+
+        updatesMata.push({
+          ...p,
+          pontos: pontosDestePalpite
+        })
+      })
+    }
+
+    // ========================================================================
+    // 5. ATUALIZA O BANCO DE DADOS EM LOTE (UPSERT)
+    // ========================================================================
+    
+    // A. Atualiza palpites de jogos
+    if (palpitesAtualizados.length > 0) {
+      const { error: erroPalpites } = await supabaseAdmin
+        .from('palpites_jogos')
+        .upsert(palpitesAtualizados, { onConflict: 'id' })
+        
+      if (erroPalpites) throw new Error(`Erro ao atualizar palpites_jogos: ${erroPalpites.message}`)
+    }
+
+    // B. Atualiza palpites de posições de grupos
+    if (updatesGrupos.length > 0) {
+      const { error: erroGrupos } = await supabaseAdmin
+        .from('palpites_grupos')
+        .upsert(updatesGrupos, { onConflict: 'id' })
+
+      if (erroGrupos) throw new Error(`Erro ao atualizar palpites_grupos: ${erroGrupos.message}`)
+    }
+
+    // C. Atualiza palpites de classificados do mata-mata
+    if (updatesMata.length > 0) {
+      const { error: erroMata } = await supabaseAdmin
+        .from('palpites_matamata')
+        .upsert(updatesMata, { onConflict: 'id' })
+
+      if (erroMata) throw new Error(`Erro ao atualizar palpites_matamata: ${erroMata.message}`)
+    }
+
+    // D. Atualiza a pontuação total consolidada no Ranking de cada Bolão
     const boloesParaAtualizar = boloes.map(b => ({
       ...b,
       pontuacao_total: rankingBoloes[b.id] || 0
     }))
 
     if (boloesParaAtualizar.length > 0) {
-      const { error: erroBoloes } = await supabaseAdmin.from('boloes').upsert(boloesParaAtualizar, { onConflict: 'id' })
+      const { error: erroBoloes } = await supabaseAdmin
+        .from('boloes')
+        .upsert(boloesParaAtualizar, { onConflict: 'id' })
+        
       if (erroBoloes) throw new Error(`Erro ao atualizar ranking dos bolões: ${erroBoloes.message}`)
     }
 
     return NextResponse.json({ 
       success: true, 
-      message: `Cálculo completo! Avaliados: ${partidasFT.length} jogos, ${timesComColocacaoDefinida.length} colocações de grupos e ${idsClassificadosR32.length} classificados para os 32-avos.` 
+      message: `Pontuação processada com sucesso! ${partidasFT.length} jogo(s) encerrado(s) avaliado(s).` 
     })
 
   } catch (err: any) {
