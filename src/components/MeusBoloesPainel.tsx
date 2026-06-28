@@ -48,7 +48,7 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [bolaoAtivo, setBolaoAtivo] = useState<Bolao | null>(null)
   const [abaAtiva, setAbaAtiva] = useState('1a_fase')
-  const [palpitesGrupos, setPalpitesGrupos] = useState<Record<string, Record<number, string>>>({})
+  const [palpitesGrupos, setPalpitesGrupos] = useState<Record<string, Record<number, { posicao: string, pontos: number }>>>({})
   const [palpites1aFase, setPalpites1aFase] = useState<Record<string, Record<string, { casa: string, fora: string, pontos: string }>>>({})
   const [palpites2aFase, setPalpites2aFase] = useState<Record<string, Record<string, { casa: string, fora: string, pontos: string }>>>({})
   const [palpitesMataMata, setPalpitesMataMata] = useState<Record<string, {
@@ -154,12 +154,19 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
         setPalpites2aFase(rec2aFase)
 
         // B) Grupos
-        const recGrupos: Record<string, Record<number, string>> = {}
+        const recGrupos: Record<string, Record<number, { posicao: string, pontos: number }>> = {}
         resGrupos.data?.forEach(p => {
           if (!recGrupos[p.bolao_id]) recGrupos[p.bolao_id] = {}
-          recGrupos[p.bolao_id][p.time_id] = p.posicao.toString()
+          
+          // Agora salvamos um objeto contendo a posição e os pontos calculados pelo banco
+          recGrupos[p.bolao_id][p.time_id] = {
+            posicao: p.posicao.toString(),
+            pontos: Number(p.pontos) || 0
+          }
         })
-        setPalpitesGrupos(recGrupos)
+        
+        // Mantivemos o nome setPalpitesGrupos (se você criou outro state, troque o nome aqui)
+        setPalpitesGrupos(recGrupos) 
 
         // C) Mata-Mata
         const recMata: any = {}
@@ -167,13 +174,19 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
           if (!recMata[p.bolao_id]) {
             recMata[p.bolao_id] = { r32: {}, r16: {}, qf: {}, sf: {}, campeao: '', vice: '' }
           }
+          
+          const objSalvo = {
+            timeId: p.time_id.toString(),
+            pontos: Number(p.pontos) || 0
+          }
+
           if (p.fase === 'campeao' || p.fase === 'vice') {
-            recMata[p.bolao_id][p.fase] = p.time_id.toString()
+            recMata[p.bolao_id][p.fase] = objSalvo
           } else {
-            recMata[p.bolao_id][p.fase][p.posicao_index] = p.time_id.toString()
+            recMata[p.bolao_id][p.fase][p.posicao_index] = objSalvo
           }
         })
-        setPalpitesMataMata(recMata)
+        setPalpitesMataMata(recMata) 
 
         // D) Prêmios (Fazemos a engenharia reversa para achar o NOME do jogador pelo ID)
         const recPremios: any = {}
@@ -285,10 +298,18 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
         // Classificação dos Grupos
         const pGrupos = palpitesGrupos[bolaoId] || {}
         const gruposParaSalvar = Object.entries(pGrupos)
-          .filter(([_, posicao]) => posicao !== '')
-          .map(([timeId, posicao]) => ({
-            bolao_id: bolaoId, time_id: parseInt(timeId), posicao: parseInt(posicao as string)
-          }))
+          .filter(([_, item]) => {
+            const pos = typeof item === 'string' ? item : item?.posicao;
+            return pos !== undefined && pos !== '';
+          })
+          .map(([timeId, item]) => {
+            const pos = typeof item === 'string' ? item : item?.posicao;
+            return {
+              bolao_id: bolaoId, 
+              time_id: parseInt(timeId), 
+              posicao: parseInt(pos as string)
+            }
+          }) 
 
         // Mata-Mata
         const pMata = palpitesMataMata[bolaoId] || { r32: {}, r16: {}, qf: {}, sf: {}, campeao: '', vice: '' }
@@ -507,19 +528,31 @@ const handleAbrirBolao = (bolao: Bolao) => {
     if (!bolaoAtivo) return // Trava de segurança
 
     setPalpitesGrupos(prev => {
-      const palpitesDoBolao = prev[bolaoAtivo.id] || {} // Pega só os palpites deste bolão
-      
+      const palpitesDoBolao = prev[bolaoAtivo.id] || {}
+
+      // Se o usuário selecionou o tracinho "-", deleta o palpite daquele time
       if (!posicao) {
-        const newState = { ...palpitesDoBolao }
-        delete newState[timeId]
-        return { ...prev, [bolaoAtivo.id]: newState }
+        const { [timeId]: _, ...resto } = palpitesDoBolao
+        return {
+          ...prev,
+          [bolaoAtivo.id]: resto
+        }
       }
-      
-      return { 
-        ...prev, 
-        [bolaoAtivo.id]: { ...palpitesDoBolao, [timeId]: posicao } 
+
+      // Pega os pontos que já estavam lá (ou zera se for palpite novo) e atualiza a posição
+      const palpiteAnterior = palpitesDoBolao[timeId] || { posicao: '', pontos: 0 }
+
+      return {
+        ...prev,
+        [bolaoAtivo.id]: {
+          ...palpitesDoBolao,
+          [timeId]: {
+            ...palpiteAnterior,
+            posicao: posicao
+          }
+        }
       }
-    })
+    }) 
   }
 
   const handlePalpite2aFase = (partidaId: string, time: 'casa' | 'fora', valor: string) => {
@@ -608,7 +641,7 @@ const handleAbrirBolao = (bolao: Bolao) => {
 
     // 2. Verifica Grupos (Todos os times devem ter posição)
     const pGrupos = palpitesGrupos[bolaoId] || {}
-    const gruposPreenchidos = Object.values(pGrupos).filter(pos => pos !== '').length
+    const gruposPreenchidos = Object.values(pGrupos).filter(item => item && item.posicao !== '').length
     if (gruposPreenchidos < times.length) return false
 
     // 3. Verifica Mata-Mata (Funil completo)
@@ -1067,7 +1100,7 @@ const handleAbrirBolao = (bolao: Bolao) => {
               )} 
 
               {/* ======================================= */}
-              {/* ABA GRUPOS (BLOQUEIA APÓS O PRAZO) */}
+              {/* ABA GRUPOS (FEEDBACK DE PONTOS) */}
               {/* ======================================= */}
               {abaAtiva === 'grupos' && (
                 <div className="animate-fade-in p-4 sm:p-6 pb-12">
@@ -1091,35 +1124,72 @@ const handleAbrirBolao = (bolao: Bolao) => {
                       ).sort().map(nomeDoGrupo => {
                         
                         const timesDoGrupo = times.filter(t => t.grupo === nomeDoGrupo)
+                        
+                        // Calcula a pontuação total apenas deste grupo
+                        const pontosDoGrupo = timesDoGrupo.reduce((soma, time) => {
+                          // CORRIGIDO: Usando palpitesGrupos
+                          const pts = palpitesGrupos?.[bolaoAtivo.id]?.[time.id]?.pontos || 0;
+                          return soma + pts;
+                        }, 0);
 
                         return (
                           <div key={nomeDoGrupo} className="bg-black/40 border border-white/5 rounded-2xl p-4 shadow-xl relative overflow-hidden group/card hover:border-teal-500/30 transition-all">
                             <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/5 blur-3xl rounded-full pointer-events-none"></div>
                             
-                            <h5 className="text-teal-400 font-black tracking-widest text-sm mb-4 uppercase flex items-center gap-2">
-                              {nomeDoGrupo.replace('GROUP', 'GRUPO')}
-                            </h5>
+                            <div className="flex items-center justify-between mb-4">
+                              <h5 className="text-teal-400 font-black tracking-widest text-sm uppercase flex items-center gap-2">
+                                {nomeDoGrupo.replace('GROUP', 'GRUPO')}
+                              </h5>
+                              
+                              {/* TAG DE PONTUAÇÃO DO GRUPO */}
+                              {isInscricoesEncerradas && (
+                                <div className={`flex items-baseline gap-1 px-2.5 py-1 rounded-lg border font-black text-xs transition-colors ${
+                                  pontosDoGrupo > 0 
+                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.15)]' 
+                                    : 'bg-white/5 border-white/10 text-gray-500'
+                                }`}>
+                                  {pontosDoGrupo} <span className="text-[9px] font-normal opacity-70 uppercase tracking-wider">pts</span>
+                                </div>
+                              )}
+                            </div>
                             
                             <div className="flex flex-col gap-2">
                               {timesDoGrupo.map(time => {
-                                const palpiteAtual = palpitesGrupos[bolaoAtivo.id]?.[time.id] || ""
+                                // CORRIGIDO: Usando palpitesGrupos
+                                const palpiteObj = palpitesGrupos?.[bolaoAtivo.id]?.[time.id] || { posicao: "", pontos: 0 }
+                                const palpiteAtual = palpiteObj.posicao
+                                const pontosGanhos = palpiteObj.pontos
+                                const acertouNaMosca = pontosGanhos > 0
+
+                                // CORRIGIDO: Usando palpitesGrupos
                                 const posicoesOcupadas = timesDoGrupo
-                                  .map(t => palpitesGrupos[bolaoAtivo.id]?.[t.id])
+                                  .map(t => palpitesGrupos?.[bolaoAtivo.id]?.[t.id]?.posicao)
                                   .filter(Boolean)
 
                                 return (
-                                  <div key={time.id} className="flex items-center justify-between bg-white/5 border border-white/5 rounded-xl p-2 px-3 hover:bg-white/10 transition-colors">
+                                  <div 
+                                    key={time.id} 
+                                    className={`flex items-center justify-between border rounded-xl p-2 px-3 transition-colors ${
+                                      acertouNaMosca 
+                                        ? 'bg-gradient-to-r from-emerald-500/10 to-transparent border-emerald-500/30' 
+                                        : 'bg-white/5 border-white/5 hover:bg-white/10'
+                                    }`}
+                                  >
                                     
                                     <div className="flex items-center gap-3 overflow-hidden">
                                       <img src={time.bandeira || '/placeholder-flag.png'} alt={time.nome} className="w-6 h-6 rounded-full object-cover shadow-md bg-white/5 shrink-0" />
-                                      <span className="text-[10px] sm:text-xs font-bold text-gray-200 uppercase truncate">
+                                      <span className={`text-[10px] sm:text-xs font-bold uppercase truncate ${acertouNaMosca ? 'text-emerald-400' : 'text-gray-200'}`}>
                                         {time.nome}
                                       </span>
                                     </div>
 
                                     {/* BLOQUEIO CONDICIONAL: GRUPOS */}
                                     {isInscricoesEncerradas ? (
-                                      <div className="bg-black/40 border border-white/5 rounded-lg text-white font-bold text-xs p-1.5 text-center shrink-0 w-12 shadow-inner">
+                                      <div className={`border rounded-lg font-black text-xs p-1.5 text-center shrink-0 w-12 shadow-inner ${
+                                        acertouNaMosca 
+                                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' 
+                                          : 'bg-black/40 border-white/5 text-white'
+                                      }`}>
                                         {palpiteAtual ? `${palpiteAtual}º` : '-'}
                                       </div>
                                     ) : (
@@ -1157,19 +1227,22 @@ const handleAbrirBolao = (bolao: Bolao) => {
                     </div>
                   )}
                 </div>
-              )}
+              )} 
 
               {/* ======================================= */}
-              {/* ABA MATA-MATA (BLOQUEIA APÓS O PRAZO) */}
+              {/* ABA MATA-MATA (FEEDBACK E CAIXA DOURADA) */}
               {/* ======================================= */}
               {abaAtiva === 'classificados' && (() => {
                 
                 const state = palpitesMataMata[bolaoAtivo.id] || { r32: {}, r16: {}, qf: {}, sf: {}, campeao: '', vice: '' }
                 
-                const opcoesR16 = times.filter(t => Object.values(state.r32).includes(t.id.toString()))
-                const opcoesQf = times.filter(t => Object.values(state.r16).includes(t.id.toString()))
-                const opcoesSf = times.filter(t => Object.values(state.qf).includes(t.id.toString()))
-                const opcoesFinal = times.filter(t => Object.values(state.sf).includes(t.id.toString()))
+                // Helper seguro: extrai apenas os IDs seja de strings antigas ou objetos novos { timeId, pontos }
+                const getIds = (faseObj: any) => Object.values(faseObj || {}).map((val: any) => typeof val === 'string' ? val : (val?.timeId || ""))
+
+                const opcoesR16 = times.filter(t => getIds(state.r32).includes(t.id.toString()))
+                const opcoesQf = times.filter(t => getIds(state.r16).includes(t.id.toString()))
+                const opcoesSf = times.filter(t => getIds(state.qf).includes(t.id.toString()))
+                const opcoesFinal = times.filter(t => getIds(state.sf).includes(t.id.toString()))
 
                 const blocosMataMata: Array<{ key: 'r32' | 'r16' | 'qf' | 'sf', label: string, count: number, opcoes: TimeCopa[] }> = [
                   { key: 'r32', label: 'Eliminatórias (32 Seleções)', count: 32, opcoes: times },
@@ -1177,6 +1250,18 @@ const handleAbrirBolao = (bolao: Bolao) => {
                   { key: 'qf', label: 'Quartas de Final (8 Seleções)', count: 8, opcoes: opcoesQf },
                   { key: 'sf', label: 'Semifinais (4 Seleções)', count: 4, opcoes: opcoesSf },
                 ]
+
+                // Helpers para Grande Final
+                const objCampeao = state.campeao || { timeId: '', pontos: 0 }
+                const idCampeao = typeof objCampeao === 'string' ? objCampeao : (objCampeao.timeId || '')
+                const ptsCampeao = typeof objCampeao === 'string' ? 0 : (objCampeao.pontos || 0)
+
+                const objVice = state.vice || { timeId: '', pontos: 0 }
+                const idVice = typeof objVice === 'string' ? objVice : (objVice.timeId || '')
+                const ptsVice = typeof objVice === 'string' ? 0 : (objVice.pontos || 0)
+
+                const ptsTotalFinal = ptsCampeao + ptsVice
+                const gabaritouFinal = isInscricoesEncerradas && (ptsCampeao > 0 && ptsVice > 0)
 
                 return (
                   <div className="animate-fade-in p-4 sm:p-6 pb-12">
@@ -1193,17 +1278,56 @@ const handleAbrirBolao = (bolao: Bolao) => {
                       <div className="flex flex-col gap-8">
                         
                         {blocosMataMata.map(fase => {
-                          const valuesOcupados = Object.values(state[fase.key])
+                          const slotsFase = Object.values(state[fase.key] || {})
+                          const valuesOcupados = getIds(state[fase.key])
+
+                          // Soma os pontos e conta acertos da etapa
+                          const pontosTotalEtapa = slotsFase.reduce((acc: number, item: any) => acc + (typeof item === 'string' ? 0 : (item?.pontos || 0)), 0)
+                          const acertosCount = slotsFase.filter((item: any) => (typeof item === 'string' ? 0 : (item?.pontos || 0)) > 0).length
+                          
+                          // REGRA DE OURO: Se acertou 100% das vagas da etapa, vira CAIXA DOURADA!
+                          const isGabarito = isInscricoesEncerradas && (acertosCount === fase.count && fase.count > 0)
 
                           return (
-                            <div key={fase.key} className="bg-black/20 border border-white/5 p-4 rounded-2xl shadow-lg">
-                              <h5 className="text-teal-400 font-black tracking-widest text-xs sm:text-sm mb-4 uppercase flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-teal-500 shadow-[0_0_8px_#14b8a6]"></span>
-                                {fase.label}
-                              </h5>
+                            <div 
+                              key={fase.key} 
+                              className={`p-4 sm:p-5 rounded-2xl transition-all relative overflow-hidden ${
+                                isGabarito 
+                                  ? 'bg-gradient-to-br from-amber-500/15 via-black/80 to-[#0a0a0a] border border-amber-500/60 shadow-[0_0_30px_rgba(245,158,11,0.2)]' 
+                                  : 'bg-black/20 border border-white/5 shadow-lg'
+                              }`}
+                            >
+                              {/* Efeito de brilho de fundo para caixa dourada */}
+                              {isGabarito && <div className="absolute -top-10 -right-10 w-40 h-40 bg-amber-500/10 blur-3xl rounded-full pointer-events-none"></div>}
+
+                              <div className="flex items-center justify-between mb-4 gap-2">
+                                <h5 className={`font-black tracking-widest text-xs sm:text-sm uppercase flex items-center gap-2 ${isGabarito ? 'text-amber-400' : 'text-teal-400'}`}>
+                                  <span className={`w-2 h-2 rounded-full shrink-0 ${isGabarito ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' : 'bg-teal-500 shadow-[0_0_8px_#14b8a6]'}`}></span>
+                                  {fase.label}
+                                </h5>
+
+                                {/* TAG DE PONTUAÇÃO DA ETAPA */}
+                                {isInscricoesEncerradas && (
+                                  <div className={`flex items-baseline gap-1 px-2.5 py-1 rounded-lg border font-black text-xs shrink-0 transition-all ${
+                                    isGabarito
+                                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
+                                      : pontosTotalEtapa > 0
+                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                        : 'bg-white/5 border-white/10 text-gray-500'
+                                  }`}>
+                                    {isGabarito && <span className="mr-1 tracking-normal">★ BÔNUS</span>}
+                                    {pontosTotalEtapa} <span className="text-[9px] font-normal opacity-70 uppercase tracking-wider">pts</span>
+                                  </div>
+                                )}
+                              </div>
+
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                                 {Array.from({ length: fase.count }).map((_, i) => {
-                                  const valueAtual = state[fase.key][i] || ""
+                                  const slotObj: any = state[fase.key][i] || ""
+                                  const valueAtual = typeof slotObj === 'string' ? slotObj : (slotObj.timeId || "")
+                                  const pontosGanhos = typeof slotObj === 'string' ? 0 : (slotObj.pontos || 0)
+                                  const acertou = pontosGanhos > 0
+
                                   const timeSelecionado = times.find(t => t.id.toString() === valueAtual)
 
                                   return (
@@ -1212,13 +1336,16 @@ const handleAbrirBolao = (bolao: Bolao) => {
                                         <img 
                                           src={timeSelecionado.bandeira || '/placeholder-flag.png'} 
                                           alt={timeSelecionado.nome} 
-                                          className="absolute left-2 sm:left-3 w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover shadow-sm pointer-events-none"
+                                          className="absolute left-2 sm:left-3 w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover shadow-sm pointer-events-none z-10"
                                         />
                                       )}
 
-                                      {/* BLOQUEIO CONDICIONAL: MATA-MATA GERAL */}
                                       {isInscricoesEncerradas ? (
-                                        <div className={`w-full bg-black/40 border border-white/5 rounded-lg text-white font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 truncate ${timeSelecionado ? 'pl-8 sm:pl-10 text-left' : 'pl-2 text-center text-gray-600'}`}>
+                                        <div className={`w-full border rounded-lg font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 truncate transition-colors ${
+                                          acertou 
+                                            ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-inner' 
+                                            : 'bg-black/40 border-white/5 text-white'
+                                        } ${timeSelecionado ? 'pl-8 sm:pl-10 text-left' : 'pl-2 text-center text-gray-600'}`}>
                                           {timeSelecionado ? timeSelecionado.nome : '—'}
                                         </div>
                                       ) : (
@@ -1251,65 +1378,92 @@ const handleAbrirBolao = (bolao: Bolao) => {
                           )
                         })}
 
-                        {/* GRANDE FINAL */}
-                        <div className="bg-gradient-to-br from-amber-900/20 to-black border border-amber-500/20 p-5 rounded-2xl shadow-xl mt-4">
-                          <h5 className="text-amber-400 font-black tracking-widest text-sm mb-4 uppercase text-center">🏆 Grande Final 🏆</h5>
+                        {/* ======================================= */}
+                        {/* GRANDE FINAL (CAMPEÃO E VICE) */}
+                        {/* ======================================= */}
+                        <div className={`p-5 rounded-2xl shadow-xl mt-4 border transition-all relative overflow-hidden ${
+                          gabaritouFinal
+                            ? 'bg-gradient-to-br from-amber-500/25 via-amber-950/40 to-black border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.3)]'
+                            : 'bg-gradient-to-br from-amber-900/20 to-black border-amber-500/20'
+                        }`}>
+                          
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="w-12 sm:w-16 hidden sm:block"></div> {/* Espaçador visual */}
+                            <h5 className="text-amber-400 font-black tracking-widest text-sm uppercase text-center flex-1">
+                              🏆 Grande Final 🏆
+                            </h5>
+                            
+                            {isInscricoesEncerradas && (
+                              <div className={`flex items-baseline gap-1 px-2.5 py-1 rounded-lg border font-black text-xs shrink-0 ${
+                                ptsTotalFinal > 0 
+                                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' 
+                                  : 'bg-white/5 border-white/10 text-gray-500'
+                              }`}>
+                                {ptsTotalFinal} <span className="text-[9px] font-normal opacity-70 uppercase tracking-wider">pts</span>
+                              </div>
+                            )}
+                          </div>
+
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             
+                            {/* CAMPEÃO */}
                             <div className="flex flex-col gap-1.5">
                               <label className="text-[10px] text-gray-400 font-bold uppercase ml-1">Campeão</label>
                               <div className="relative flex items-center w-full">
-                                {state.campeao && (() => {
-                                  const timeCampeao = times.find(t => t.id.toString() === state.campeao)
+                                {idCampeao && (() => {
+                                  const timeCampeao = times.find(t => t.id.toString() === idCampeao)
                                   return timeCampeao ? (
                                     <img src={timeCampeao.bandeira || '/placeholder-flag.png'} alt={timeCampeao.nome} className="absolute left-3 w-6 h-6 rounded-full object-cover shadow-sm pointer-events-none z-10" />
                                   ) : null
                                 })()}
                                 
-                                {/* BLOQUEIO CONDICIONAL: FINAL (CAMPEÃO) */}
                                 {isInscricoesEncerradas ? (
-                                  <div className={`w-full bg-black/40 border border-white/5 rounded-lg text-white font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 truncate ${state.campeao ? 'pl-11 text-left' : 'pl-2 text-center text-gray-600'}`}>
-                                    {state.campeao ? times.find(t => t.id.toString() === state.campeao)?.nome : '—'}
+                                  <div className={`w-full border rounded-lg font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 truncate transition-colors ${
+                                    ptsCampeao > 0 ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-black/40 border-white/5 text-white'
+                                  } ${idCampeao ? 'pl-11 text-left' : 'pl-2 text-center text-gray-600'}`}>
+                                    {idCampeao ? times.find(t => t.id.toString() === idCampeao)?.nome : '—'}
                                   </div>
                                 ) : (
                                   <select
-                                    value={state.campeao}
+                                    value={idCampeao}
                                     onChange={(e) => handleMataMataChange('campeao', 0, e.target.value)}
-                                    className={`w-full bg-black/60 border border-white/10 rounded-lg text-white font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 focus:outline-none appearance-none cursor-pointer hover:bg-black/80 focus:bg-zinc-900 transition-all truncate [color-scheme:dark] ${state.campeao ? 'pl-11 text-left' : 'pl-2 text-center'}`}
+                                    className={`w-full bg-black/60 border border-white/10 rounded-lg text-white font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 focus:outline-none appearance-none cursor-pointer hover:bg-black/80 focus:bg-zinc-900 transition-all truncate [color-scheme:dark] ${idCampeao ? 'pl-11 text-left' : 'pl-2 text-center'}`}
                                   >
                                     <option value="" className="text-gray-500">- Escolher Campeão -</option>
                                     {opcoesFinal.map(time => (
-                                      <option key={time.id} value={time.id} disabled={state.vice === time.id.toString()}>{time.nome}</option>
+                                      <option key={time.id} value={time.id} disabled={idVice === time.id.toString()}>{time.nome}</option>
                                     ))}
                                   </select>
                                 )}
                               </div>
                             </div>
 
+                            {/* VICE-CAMPEÃO */}
                             <div className="flex flex-col gap-1.5">
                               <label className="text-[10px] text-gray-400 font-bold uppercase ml-1">Vice-Campeão</label>
                               <div className="relative flex items-center w-full">
-                                {state.vice && (() => {
-                                  const timeVice = times.find(t => t.id.toString() === state.vice)
+                                {idVice && (() => {
+                                  const timeVice = times.find(t => t.id.toString() === idVice)
                                   return timeVice ? (
                                     <img src={timeVice.bandeira || '/placeholder-flag.png'} alt={timeVice.nome} className="absolute left-3 w-6 h-6 rounded-full object-cover shadow-sm pointer-events-none z-10" />
                                   ) : null
                                 })()}
 
-                                {/* BLOQUEIO CONDICIONAL: FINAL (VICE) */}
                                 {isInscricoesEncerradas ? (
-                                  <div className={`w-full bg-black/40 border border-white/5 rounded-lg text-white font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 truncate ${state.vice ? 'pl-11 text-left' : 'pl-2 text-center text-gray-600'}`}>
-                                    {state.vice ? times.find(t => t.id.toString() === state.vice)?.nome : '—'}
+                                  <div className={`w-full border rounded-lg font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 truncate transition-colors ${
+                                    ptsVice > 0 ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-black/40 border-white/5 text-white'
+                                  } ${idVice ? 'pl-11 text-left' : 'pl-2 text-center text-gray-600'}`}>
+                                    {idVice ? times.find(t => t.id.toString() === idVice)?.nome : '—'}
                                   </div>
                                 ) : (
                                   <select
-                                    value={state.vice}
+                                    value={idVice}
                                     onChange={(e) => handleMataMataChange('vice', 0, e.target.value)}
-                                    className={`w-full bg-black/60 border border-white/10 rounded-lg text-white font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 focus:outline-none appearance-none cursor-pointer hover:bg-black/80 focus:bg-zinc-900 transition-all truncate [color-scheme:dark] ${state.vice ? 'pl-11 text-left' : 'pl-2 text-center'}`}
+                                    className={`w-full bg-black/60 border border-white/10 rounded-lg text-white font-bold text-[10px] sm:text-xs py-2 sm:py-2.5 pr-2 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 focus:outline-none appearance-none cursor-pointer hover:bg-black/80 focus:bg-zinc-900 transition-all truncate [color-scheme:dark] ${idVice ? 'pl-11 text-left' : 'pl-2 text-center'}`}
                                   >
                                     <option value="" className="text-gray-500">- Escolher Vice -</option>
                                     {opcoesFinal.map(time => (
-                                      <option key={time.id} value={time.id} disabled={state.campeao === time.id.toString()}>{time.nome}</option>
+                                      <option key={time.id} value={time.id} disabled={idCampeao === time.id.toString()}>{time.nome}</option>
                                     ))}
                                   </select>
                                 )}
@@ -1323,7 +1477,7 @@ const handleAbrirBolao = (bolao: Bolao) => {
                     )}
                   </div>
                 )
-              })()}
+              })()} 
 
               {/* ======================================= */}
               {/* ABA PRÊMIOS (BLOQUEIA APÓS O PRAZO) */}
