@@ -20,12 +20,12 @@ export async function GET(req: NextRequest) {
     // 1. Procura no banco estritamente as partidas que precisamos ficar vigiando
     const { data: partidasCriticas, error: erroPartidas } = await supabaseAdmin
       .from('partidas')
-      .select('*') // Puxa todos os campos para usarmos no loop
+      .select('*') 
       .or(`status.eq.LIVE,and(status.eq.NS,data_hora.lte.${dezMinutosDepois.toISOString()})`)
 
     if (erroPartidas) throw erroPartidas
 
-    // Se não tem jogo rolando, encerra e poupa a API (Isso previne sobrescrever status antigos!)
+    // Se não tem jogo rolando, encerra e poupa a API
     if (!partidasCriticas || partidasCriticas.length === 0) {
       return NextResponse.json({ 
         success: true, 
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
     for (const jogoBanco of partidasCriticas) {
       const jogoApi = jogosDaApi.find((m: any) => m.id === jogoBanco.fixture_id)
       
-      // Se a API não mandou o jogo de hoje (delay deles), a gente pula e tenta na próxima rodada do cron
+      // Se a API não mandou o jogo de hoje, pula e tenta na próxima rodada do cron
       if (!jogoApi) continue
 
       let novoStatus = jogoBanco.status
@@ -72,9 +72,24 @@ export async function GET(req: NextRequest) {
       else if (jogoApi.status === 'IN_PLAY' || jogoApi.status === 'PAUSED') novoStatus = 'LIVE'
       else if (jogoApi.status === 'TIMED' || jogoApi.status === 'SCHEDULED') novoStatus = 'NS'
 
-      // Leitura robusta dos gols da API
-      const novosGolsCasa = jogoApi.score?.fullTime?.home ?? jogoBanco.gols_casa
-      const novosGolsFora = jogoApi.score?.fullTime?.away ?? jogoBanco.gols_fora
+      // =======================================================================
+      // INTELIGÊNCIA DE PRORROGAÇÃO: 
+      // Garante que o placar extraia sempre os 90 minutos iniciais.
+      // =======================================================================
+      const duracaoDoJogo = jogoApi.score?.duration
+      let objPlacarAUsar = jogoApi.score?.fullTime
+
+      // Se a API marcou que o jogo foi pra prorrogação (EXTRA_TIME) ou Penaltis (PENALTY_SHOOTOUT)
+      if (duracaoDoJogo === 'EXTRA_TIME' || duracaoDoJogo === 'PENALTY_SHOOTOUT') {
+        // Puxa o 'regularTime' (90 min) se ele existir na resposta da API
+        if (jogoApi.score?.regularTime) {
+          objPlacarAUsar = jogoApi.score.regularTime
+        }
+      }
+
+      // Extrai os gols finais com fallback para o que já estava no banco
+      const novosGolsCasa = objPlacarAUsar?.home ?? jogoBanco.gols_casa
+      const novosGolsFora = objPlacarAUsar?.away ?? jogoBanco.gols_fora
 
       if (jogoBanco.status === 'LIVE' && novoStatus === 'FT') {
         houveJogoFinalizado = true
