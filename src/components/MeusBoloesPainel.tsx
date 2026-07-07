@@ -955,149 +955,185 @@ const handleAbrirBolao = (bolao: Bolao) => {
               )}
 
               {/* ======================================= */}
-              {/* ABA 2A FASE (BLOQUEIO INTELIGENTE) */}
+              {/* ABA 2A FASE (DIVISÓRIA POR ETAPA E BLOQUEIO) */}
               {/* ======================================= */}
-              {abaAtiva === '2a_fase' && (
-                <div className="animate-fade-in pb-8">
-                  <div className="px-3 py-4 sm:px-6 border-b border-white/5 sticky top-0 bg-[#0a0a0a] z-30 flex text-[10px] sm:text-xs font-bold uppercase tracking-widest text-gray-500">
-                    <div className="w-12 sm:w-16 text-center">Data</div>
-                    <div className="flex-1 text-center">Jogo</div>
-                    <div className="w-12 sm:w-16 text-center">Pts</div>
-                  </div>
+              {abaAtiva === '2a_fase' && (() => {
+                
+                // Tradutor inteligente de códigos da API/Banco para português limpo
+                const obterNomeFase = (faseRaw: string) => {
+                  if (!faseRaw) return 'Mata-Mata';
+                  const f = faseRaw.toUpperCase();
+                  if (f.includes('32') || f === 'R32') return 'Eliminatórias';
+                  if (f.includes('16') || f === 'R16' || f.includes('OITAVAS')) return 'Oitavas de Final';
+                  if (f.includes('QUARTER') || f === 'QF' || f.includes('QUARTAS')) return 'Quartas de Final';
+                  if (f.includes('SEMI') || f === 'SF') return 'Semifinais';
+                  if (f.includes('THIRD') || f.includes('3RD') || f.includes('3º')) return 'Disputa pelo 3º Lugar';
+                  if (f.includes('FINAL') || f === 'CAMPEAO') return '🏆 Grande Final 🏆';
+                  return faseRaw;
+                };
 
-                  <div className="flex flex-col">
-                    {partidas2f.length === 0 ? (
-                      <p className="p-6 text-center text-sm text-gray-500 border border-white/5 mx-6 mt-6 rounded-2xl bg-white/[0.02]">
-                        A tabela do mata-mata ainda não foi disponibilizada pela FIFA.
-                      </p>
-                    ) : (
-                      partidas2f.map((jogo) => {
-                        const { diaMes, hora } = formatarData(jogo.data_hora)
-                        const isIndefinido = jogo.time_casa === 'A Definir' || jogo.time_fora === 'A Definir'
-                        const palpiteCasa = palpites2aFase[bolaoAtivo.id]?.[jogo.id]?.casa ?? ''
-                        const palpiteFora = palpites2aFase[bolaoAtivo.id]?.[jogo.id]?.fora ?? ''
-                        const pontosGanhos = palpites2aFase[bolaoAtivo.id]?.[jogo.id]?.pontos ?? 0
+                return (
+                  <div className="animate-fade-in pb-8">
+                    <div className="px-3 py-4 sm:px-6 border-b border-white/5 sticky top-0 bg-[#0a0a0a] z-30 flex text-[10px] sm:text-xs font-bold uppercase tracking-widest text-gray-500 shadow-md">
+                      <div className="w-12 sm:w-16 text-center">Data</div>
+                      <div className="flex-1 text-center">Jogo</div>
+                      <div className="w-12 sm:w-16 text-center">Pts</div>
+                    </div>
 
-                        return (
-                          <div key={jogo.id} className={`flex items-center justify-between px-3 py-4 sm:px-6 border-b border-white/5 transition-colors ${isIndefinido ? 'opacity-80 bg-black/20' : 'hover:bg-white/[0.02]'}`}>
-                            
-                            <div className="w-12 sm:w-16 flex flex-col items-center justify-center text-gray-400 shrink-0">
-                              <span className="text-xs sm:text-sm font-bold text-white">{diaMes}</span>
-                              <span className="text-[9px] sm:text-[11px]">{hora}</span>
-                            </div>
+                    <div className="flex flex-col">
+                      {partidas2f.length === 0 ? (
+                        <p className="p-6 text-center text-sm text-gray-500 border border-white/5 mx-6 mt-6 rounded-2xl bg-white/[0.02]">
+                          A tabela do mata-mata ainda não foi disponibilizada pela FIFA.
+                        </p>
+                      ) : (
+                        partidas2f.map((jogo, index) => {
+                          const { diaMes, hora } = formatarData(jogo.data_hora)
+                          const isIndefinido = jogo.time_casa === 'A Definir' || jogo.time_fora === 'A Definir'
+                          const palpiteCasa = palpites2aFase[bolaoAtivo.id]?.[jogo.id]?.casa ?? ''
+                          const palpiteFora = palpites2aFase[bolaoAtivo.id]?.[jogo.id]?.fora ?? ''
+                          const pontosGanhos = palpites2aFase[bolaoAtivo.id]?.[jogo.id]?.pontos ?? 0
 
-                            <div className="flex-1 flex items-center justify-center gap-2 sm:gap-6 min-w-0">
+                          // LÓGICA DA DIVISÓRIA: Verifica se a fase mudou em relação à partida anterior
+                          const faseAtual = jogo.fase || 'mata_mata';
+                          const faseAnterior = index > 0 ? (partidas2f[index - 1].fase || 'mata_mata') : null;
+                          const mostrarDivisoria = faseAtual !== faseAnterior;
+                          const nomeFaseFormatado = obterNomeFase(faseAtual);
+
+                          return (
+                            <div key={jogo.id} className="flex flex-col">
                               
-                              <div className="flex flex-col items-center gap-1.5 w-16 sm:w-28 overflow-hidden shrink-0">
-                                {isIndefinido || !jogo.bandeira_casa ? (
-                                  <div className="w-6 h-6 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 shadow-md">
-                                    <span className="text-gray-500 text-[10px] sm:text-sm font-black">?</span>
-                                  </div>
-                                ) : (
-                                  <img src={jogo.bandeira_casa} alt={jogo.time_casa} className="w-6 h-6 sm:w-10 sm:h-10 rounded-full object-cover shadow-md border border-white/10 bg-white/5" />
-                                )}
-                                <span className={`text-[8px] sm:text-[10px] font-bold uppercase text-center leading-tight truncate w-full ${isIndefinido ? 'text-gray-600' : 'text-gray-300'}`}>
-                                  {jogo.time_casa}
-                                </span>
-                              </div>
+                              {/* BANNER DA ETAPA (Renderiza apenas na virada de fase) */}
+                              {mostrarDivisoria && (
+                                <div className="bg-gradient-to-r from-teal-950/40 via-black/90 to-transparent border-y border-teal-500/20 px-4 py-2.5 sm:px-6 flex items-center gap-2.5 mt-4 first:mt-0">
+                                  <span className="w-2 h-2 rounded-full bg-teal-400 shadow-[0_0_8px_#2dd4bf] shrink-0"></span>
+                                  <span className="text-xs sm:text-sm font-black tracking-widest uppercase text-teal-400">
+                                    {nomeFaseFormatado}
+                                  </span>
+                                </div>
+                              )}
 
-                              <div className="flex flex-col items-center justify-center shrink-0">
-                                <div className="flex items-center gap-1 sm:gap-4 shrink-0">
-                                  {/* TRAVA DINÂMICA: Verifica se já finalizou, se está rolando (LIVE), ou se faltam < 60 min */}
-                                  {jogo.status === 'FT' || jogo.status === 'LIVE' || verificarBloqueioPartida(jogo.data_hora) ? (
-                                    <>
-                                      <div className={`w-8 h-10 sm:w-12 sm:h-14 flex items-center justify-center border rounded-lg sm:rounded-xl text-base sm:text-xl font-black shadow-inner ${jogo.status === 'FT' ? 'bg-black/80 border-white/5 text-gray-400' : 'bg-black/50 border-white/10 text-white'}`}>
-                                        {palpiteCasa !== '' ? palpiteCasa : '-'}
+                              {/* LINHA DO JOGO */}
+                              <div className={`flex items-center justify-between px-3 py-4 sm:px-6 border-b border-white/5 transition-colors ${isIndefinido ? 'opacity-80 bg-black/20' : 'hover:bg-white/[0.02]'}`}>
+                                
+                                <div className="w-12 sm:w-16 flex flex-col items-center justify-center text-gray-400 shrink-0">
+                                  <span className="text-xs sm:text-sm font-bold text-white">{diaMes}</span>
+                                  <span className="text-[9px] sm:text-[11px]">{hora}</span>
+                                </div>
+
+                                <div className="flex-1 flex items-center justify-center gap-2 sm:gap-6 min-w-0">
+                                  
+                                  <div className="flex flex-col items-center gap-1.5 w-16 sm:w-28 overflow-hidden shrink-0">
+                                    {isIndefinido || !jogo.bandeira_casa ? (
+                                      <div className="w-6 h-6 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 shadow-md">
+                                        <span className="text-gray-500 text-[10px] sm:text-sm font-black">?</span>
                                       </div>
-                                      <span className="text-gray-600 font-bold text-xs sm:text-sm">X</span>
-                                      <div className={`w-8 h-10 sm:w-12 sm:h-14 flex items-center justify-center border rounded-lg sm:rounded-xl text-base sm:text-xl font-black shadow-inner ${jogo.status === 'FT' ? 'bg-black/80 border-white/5 text-gray-400' : 'bg-black/50 border-white/10 text-white'}`}>
-                                        {palpiteFora !== '' ? palpiteFora : '-'}
+                                    ) : (
+                                      <img src={jogo.bandeira_casa} alt={jogo.time_casa} className="w-6 h-6 sm:w-10 sm:h-10 rounded-full object-cover shadow-md border border-white/10 bg-white/5" />
+                                    )}
+                                    <span className={`text-[8px] sm:text-[10px] font-bold uppercase text-center leading-tight truncate w-full ${isIndefinido ? 'text-gray-600' : 'text-gray-300'}`}>
+                                      {jogo.time_casa}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex flex-col items-center justify-center shrink-0">
+                                    <div className="flex items-center gap-1 sm:gap-4 shrink-0">
+                                      {/* TRAVA DINÂMICA */}
+                                      {jogo.status === 'FT' || jogo.status === 'LIVE' || verificarBloqueioPartida(jogo.data_hora) ? (
+                                        <>
+                                          <div className={`w-8 h-10 sm:w-12 sm:h-14 flex items-center justify-center border rounded-lg sm:rounded-xl text-base sm:text-xl font-black shadow-inner ${jogo.status === 'FT' ? 'bg-black/80 border-white/5 text-gray-400' : 'bg-black/50 border-white/10 text-white'}`}>
+                                            {palpiteCasa !== '' ? palpiteCasa : '-'}
+                                          </div>
+                                          <span className="text-gray-600 font-bold text-xs sm:text-sm">X</span>
+                                          <div className={`w-8 h-10 sm:w-12 sm:h-14 flex items-center justify-center border rounded-lg sm:rounded-xl text-base sm:text-xl font-black shadow-inner ${jogo.status === 'FT' ? 'bg-black/80 border-white/5 text-gray-400' : 'bg-black/50 border-white/10 text-white'}`}>
+                                            {palpiteFora !== '' ? palpiteFora : '-'}
+                                          </div>
+                                        </>
+                                      ) : isIndefinido ? ( 
+                                        <div className="flex items-center justify-center w-20 sm:w-28 bg-black/60 border border-white/10 rounded-lg sm:rounded-xl px-2 sm:px-4 py-1.5 sm:py-2.5 shadow-inner">
+                                          <span className="text-xs sm:text-sm mr-1 sm:mr-1.5">🔒</span>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <input 
+                                            type="text" 
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            maxLength={2}
+                                            value={palpiteCasa}
+                                            onChange={(e) => handlePalpite2aFase(jogo.id, 'casa', e.target.value)}
+                                            className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black/60 border border-white/10 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
+                                          />
+                                          <span className="text-gray-500 font-bold text-xs sm:text-sm">X</span>
+                                          <input 
+                                            type="text" 
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            maxLength={2}
+                                            value={palpiteFora}
+                                            onChange={(e) => handlePalpite2aFase(jogo.id, 'fora', e.target.value)}
+                                            className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black/60 border border-white/10 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
+                                          />
+                                        </>
+                                      )}
+                                    </div>
+                                    
+                                    {/* PLACAR OFICIAL */}
+                                    {jogo.status === 'FT' && (
+                                      <div className="mt-1 sm:mt-1.5 flex flex-col items-center leading-none">
+                                        <span className="font-black text-[10px] sm:text-xs text-gray-300 tracking-[0.15em]">
+                                          {jogo.gols_casa} x {jogo.gols_fora}
+                                        </span>
+                                        <span className="text-[7px] sm:text-[8px] uppercase tracking-widest text-gray-500 mt-1">
+                                          Oficial
+                                        </span>
                                       </div>
-                                    </>
-                                  ) : isIndefinido ? ( 
-                                    <div className="flex items-center justify-center w-20 sm:w-28 bg-black/60 border border-white/10 rounded-lg sm:rounded-xl px-2 sm:px-4 py-1.5 sm:py-2.5 shadow-inner">
-                                      <span className="text-xs sm:text-sm mr-1 sm:mr-1.5">🔒</span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex flex-col items-center gap-1.5 w-16 sm:w-28 overflow-hidden shrink-0">
+                                    {isIndefinido || !jogo.bandeira_fora ? (
+                                      <div className="w-6 h-6 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 shadow-md">
+                                        <span className="text-gray-500 text-[10px] sm:text-sm font-black">?</span>
+                                      </div>
+                                    ) : (
+                                      <img src={jogo.bandeira_fora} alt={jogo.time_fora} className="w-6 h-6 sm:w-10 sm:h-10 rounded-full object-cover shadow-md border border-white/10 bg-white/5" />
+                                    )}
+                                    <span className={`text-[8px] sm:text-[10px] font-bold uppercase text-center leading-tight truncate w-full ${isIndefinido ? 'text-gray-600' : 'text-gray-300'}`}>
+                                      {jogo.time_fora}
+                                    </span>
+                                  </div>
+
+                                </div>
+
+                                <div className="w-12 sm:w-16 flex items-center justify-center shrink-0">
+                                  {jogo.status === 'FT' ? (
+                                    <div 
+                                      className={`flex items-baseline gap-0.5 px-2 py-1 rounded border font-black text-[10px] sm:text-xs transition-colors ${
+                                        pontosGanhos === '10' ? 'bg-amber-400/10 border-amber-400/30 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.25)]' :
+                                        pontosGanhos === '7'  ? 'bg-green-500/10 border-green-500/30 text-green-400 shadow-[0_0_8px_rgba(34,197,94,0.15)]' :
+                                        pontosGanhos === '5'  ? 'bg-white/10 border-white/20 text-white shadow-[0_0_8px_rgba(255,255,255,0.1)]' :
+                                        pontosGanhos === '2'  ? 'bg-orange-500/10 border-orange-500/30 text-orange-500 shadow-[0_0_8px_rgba(253,224,71,0.1)]' :
+                                        'bg-red-500/10 border-red-500/30 text-red-500 shadow-[0_0_8px_rgba(239,68,68,0.15)]'
+                                      }`}
+                                    >
+                                      {pontosGanhos} <span className="text-[8px] font-normal opacity-70">pts</span>
                                     </div>
                                   ) : (
-                                    <>
-                                      <input 
-                                        type="text" 
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        maxLength={2}
-                                        value={palpiteCasa}
-                                        onChange={(e) => handlePalpite2aFase(jogo.id, 'casa', e.target.value)}
-                                        className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black/60 border border-white/10 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
-                                      />
-                                      <span className="text-gray-500 font-bold text-xs sm:text-sm">X</span>
-                                      <input 
-                                        type="text" 
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        maxLength={2}
-                                        value={palpiteFora}
-                                        onChange={(e) => handlePalpite2aFase(jogo.id, 'fora', e.target.value)}
-                                        className="w-8 h-10 sm:w-12 sm:h-14 p-0 bg-black/60 border border-white/10 rounded-lg sm:rounded-xl text-center text-base sm:text-xl font-black text-white focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-all shadow-inner"
-                                      />
-                                    </>
+                                    <span className="text-[9px] sm:text-[11px] font-bold text-teal-500/50 flex gap-1">
+                                      <span className="text-amber-400/50">-</span> pts
+                                    </span>
                                   )}
                                 </div>
-                                
-                                {/* PLACAR OFICIAL (Aparece centralizado embaixo apenas quando finalizado) */}
-                                {jogo.status === 'FT' && (
-                                  <div className="mt-1 sm:mt-1.5 flex flex-col items-center leading-none">
-                                    <span className="font-black text-[10px] sm:text-xs text-gray-300 tracking-[0.15em]">
-                                      {jogo.gols_casa} x {jogo.gols_fora}
-                                    </span>
-                                    <span className="text-[7px] sm:text-[8px] uppercase tracking-widest text-gray-500 mt-1">
-                                      Oficial
-                                    </span>
-                                  </div>
-                                )}
+
                               </div>
-
-                              <div className="flex flex-col items-center gap-1.5 w-16 sm:w-28 overflow-hidden shrink-0">
-                                {isIndefinido || !jogo.bandeira_fora ? (
-                                  <div className="w-6 h-6 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 shadow-md">
-                                    <span className="text-gray-500 text-[10px] sm:text-sm font-black">?</span>
-                                  </div>
-                                ) : (
-                                  <img src={jogo.bandeira_fora} alt={jogo.time_fora} className="w-6 h-6 sm:w-10 sm:h-10 rounded-full object-cover shadow-md border border-white/10 bg-white/5" />
-                                )}
-                                <span className={`text-[8px] sm:text-[10px] font-bold uppercase text-center leading-tight truncate w-full ${isIndefinido ? 'text-gray-600' : 'text-gray-300'}`}>
-                                  {jogo.time_fora}
-                                </span>
-                              </div>
-
                             </div>
-
-                            <div className="w-12 sm:w-16 flex items-center justify-center shrink-0">
-                              {jogo.status === 'FT' ? (
-                                <div 
-                                  className={`flex items-baseline gap-0.5 px-2 py-1 rounded border font-black text-[10px] sm:text-xs transition-colors ${
-                                    pontosGanhos === '10' ? 'bg-amber-400/10 border-amber-400/30 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.25)]' :
-                                    pontosGanhos === '7'  ? 'bg-green-500/10 border-green-500/30 text-green-400 shadow-[0_0_8px_rgba(34,197,94,0.15)]' :
-                                    pontosGanhos === '5'  ? 'bg-white/10 border-white/20 text-white shadow-[0_0_8px_rgba(255,255,255,0.1)]' :
-                                    pontosGanhos === '2'  ? 'bg-orange-500/10 border-orange-500/30 text-orange-500 shadow-[0_0_8px_rgba(253,224,71,0.1)]' :
-                                    'bg-red-500/10 border-red-500/30 text-red-500 shadow-[0_0_8px_rgba(239,68,68,0.15)]'
-                                  }`}
-                                >
-                                  {pontosGanhos} <span className="text-[8px] font-normal opacity-70">pts</span>
-                                </div>
-                              ) : (
-                                <span className="text-[9px] sm:text-[11px] font-bold text-teal-500/50 flex gap-1">
-                                  <span className="text-amber-400/50">-</span> pts
-                                </span>
-                              )}
-                            </div>
-
-                          </div>
-                        )
-                      })
-                    )}
+                          )
+                        })
+                      )}
+                    </div>
                   </div>
-                </div>
-              )} 
+                )
+              })()} 
 
               {/* ======================================= */}
               {/* ABA GRUPOS (FEEDBACK DE PONTOS) */}
