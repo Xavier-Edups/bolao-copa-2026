@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { calcularPontosPartida } from '@/utils/calculadoraPontos'
 
+// ============================================================================
+// INJEÇÃO MANUAL DA GRANDE FINAL
+// Digite o nome EXATO em inglês (como está no banco, ex: "Brazil", "France").
+// Deixe como null se a final ainda não tiver acontecido.
+// ============================================================================
+const FINAL_MANUAL = {
+  CAMPEAO: "Espanha", // Ex: "Argentina"
+  VICE: "Argentina"        // Ex: "France"
+}
+
 // CONFIGURAÇÃO DAS REGRAS E PESOS DE PONTUAÇÃO DO BOLÃO
 const REGRAS = {
   GRUPO_ACERTO: 3,
@@ -53,18 +63,16 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 1. Busca os bolões ativos
     const boloes = await buscarTodosOsRegistros('boloes')
     if (!boloes || boloes.length === 0) return NextResponse.json({ message: 'Nenhum bolão ativo.' })
 
-    // 2. Busca todas as tabelas em paralelo
     const [partidasFT, todasPartidas, timesCopa, palpitesJogos, palpitesGrupos, palpitesMata] = await Promise.all([
       buscarTodosOsRegistros('partidas', (q) => q.eq('status', 'FT')),
       buscarTodosOsRegistros('partidas'),
       buscarTodosOsRegistros('times_copa'),
       buscarTodosOsRegistros('palpites_jogos'),
       buscarTodosOsRegistros('palpites_grupos'),
-      buscarTodosOsRegistros('palpites_matamata') // Puxa todos os palpites do mata-mata
+      buscarTodosOsRegistros('palpites_matamata')
     ])
 
     const rankingBoloes: Record<string, number> = {}
@@ -123,6 +131,7 @@ export async function POST(req: NextRequest) {
     const reaisR16 = new Set<number>()
     const reaisQF = new Set<number>()
     const reaisSF = new Set<number>()
+    
     let realCampeaoId: number | null = null
     let realViceId: number | null = null
 
@@ -135,7 +144,6 @@ export async function POST(req: NextRequest) {
       const idCasa = obterTimeIdPorNome(j.time_casa)
       const idFora = obterTimeIdPorNome(j.time_fora)
 
-      // Varre as fases para descobrir quem jogou ou vai jogar cada rodada
       if (j.fase === 'LAST_32') {
         if (idCasa) reaisR32.add(Number(idCasa))
         if (idFora) reaisR32.add(Number(idFora))
@@ -148,23 +156,26 @@ export async function POST(req: NextRequest) {
       } else if (j.fase === 'SEMI_FINALS') {
         if (idCasa) reaisSF.add(Number(idCasa))
         if (idFora) reaisSF.add(Number(idFora))
-      } else if (j.fase === 'FINAL' && j.status === 'FT') {
-        // Quando a final termina (FT), decide Campeão e Vice pelos gols regulamentares
-        const gCasa = Number(j.gols_casa)
-        const gFora = Number(j.gols_fora)
-        if (idCasa && idFora) {
-          if (gCasa > gFora) { realCampeaoId = Number(idCasa); realViceId = Number(idFora) }
-          else { realCampeaoId = Number(idFora); realViceId = Number(idCasa) }
-        }
       }
+      // REMOVIDO: A lógica automática falha que tentava adivinhar a final pelos gols
     })
+
+    // INJEÇÃO DOS IDs DO CAMPEÃO E VICE BASEADO NA CONSTANTE MANUAL NO TOPO DO ARQUIVO
+    if (FINAL_MANUAL.CAMPEAO) {
+      const tCamp = timesCopa.find(t => t.nome.toLowerCase() === FINAL_MANUAL.CAMPEAO?.toLowerCase())
+      if (tCamp) realCampeaoId = Number(tCamp.id)
+    }
+
+    if (FINAL_MANUAL.VICE) {
+      const tVice = timesCopa.find(t => t.nome.toLowerCase() === FINAL_MANUAL.VICE?.toLowerCase())
+      if (tVice) realViceId = Number(tVice.id)
+    }
 
     // ========================================================================
     // ETAPA 4: PROCESSAMENTO DE TODAS AS FASES DO MATA-MATA (COM BÔNUS)
     // ========================================================================
     const updatesMata: any[] = []
 
-    // Agrupamento de configurações das fases de lista para rodar no loop
     const configuracaoFases = [
       { key: 'r32', reais: reaisR32, acertoPeso: REGRAS.R32_ACERTO, bonusPeso: REGRAS.R32_BONUS, limite: 32 },
       { key: 'r16', reais: reaisR16, acertoPeso: REGRAS.R16_ACERTO, bonusPeso: REGRAS.R16_BONUS, limite: 16 },
@@ -191,7 +202,6 @@ export async function POST(req: NextRequest) {
           const acertou = fase.reais.has(Number(p.time_id))
           let pontosPalpite = acertou ? fase.acertoPeso : 0
 
-          // Injeta o bônus na linha zero da fase correspondente caso gabarite
           if (acertou && p.posicao_index === 0 && gabaritou) {
             pontosPalpite += pontosBonus
           }
@@ -240,7 +250,6 @@ export async function POST(req: NextRequest) {
 
     await Promise.all(promessasUpsert)
 
-    // Atualiza a tabela de bolões com os novos valores finais calculados
     for (const bolao of boloes) {
       const pontosFinais = rankingBoloes[bolao.id] || 0
       const { error: erroUpdateBolao } = await supabaseAdmin
