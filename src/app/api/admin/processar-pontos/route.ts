@@ -3,13 +3,17 @@ import { createClient } from '@supabase/supabase-js'
 import { calcularPontosPartida } from '@/utils/calculadoraPontos'
 
 // ============================================================================
-// INJEÇÃO MANUAL DA GRANDE FINAL
-// Digite o nome EXATO em inglês (como está no banco, ex: "Brazil", "France").
-// Deixe como null se a final ainda não tiver acontecido.
+// INJEÇÃO MANUAL DA GRANDE FINAL E PRÊMIOS INDIVIDUAIS
 // ============================================================================
 const FINAL_MANUAL = {
-  CAMPEAO: "Espanha", // Ex: "Argentina"
-  VICE: "Argentina"        // Ex: "France"
+  CAMPEAO: "Espanha",
+  VICE: "Argentina"
+}
+
+const PREMIOS_MANUAIS = {
+  bolaDeOuro: 3199,
+  chuteiraDeOuro: 3374,
+  luvaDeOuro: 32570
 }
 
 // CONFIGURAÇÃO DAS REGRAS E PESOS DE PONTUAÇÃO DO BOLÃO
@@ -24,7 +28,11 @@ const REGRAS = {
   SF_ACERTO: 10,
   SF_BONUS: 10,
   VICE_ACERTO: 30,
-  CAMPEAO_ACERTO: 40
+  CAMPEAO_ACERTO: 40,
+  
+  PREMIO_BOLA_OURO: 30,
+  PREMIO_CHUTEIRA_OURO: 25,
+  PREMIO_LUVA_OURO: 20
 }
 
 const supabaseAdmin = createClient(
@@ -66,13 +74,15 @@ export async function POST(req: NextRequest) {
     const boloes = await buscarTodosOsRegistros('boloes')
     if (!boloes || boloes.length === 0) return NextResponse.json({ message: 'Nenhum bolão ativo.' })
 
-    const [partidasFT, todasPartidas, timesCopa, palpitesJogos, palpitesGrupos, palpitesMata] = await Promise.all([
+    // Adicionamos a busca da tabela `palpites_premios`
+    const [partidasFT, todasPartidas, timesCopa, palpitesJogos, palpitesGrupos, palpitesMata, palpitesPremios] = await Promise.all([
       buscarTodosOsRegistros('partidas', (q) => q.eq('status', 'FT')),
       buscarTodosOsRegistros('partidas'),
       buscarTodosOsRegistros('times_copa'),
       buscarTodosOsRegistros('palpites_jogos'),
       buscarTodosOsRegistros('palpites_grupos'),
-      buscarTodosOsRegistros('palpites_matamata')
+      buscarTodosOsRegistros('palpites_matamata'),
+      buscarTodosOsRegistros('palpites_premios') 
     ])
 
     const rankingBoloes: Record<string, number> = {}
@@ -157,10 +167,8 @@ export async function POST(req: NextRequest) {
         if (idCasa) reaisSF.add(Number(idCasa))
         if (idFora) reaisSF.add(Number(idFora))
       }
-      // REMOVIDO: A lógica automática falha que tentava adivinhar a final pelos gols
     })
 
-    // INJEÇÃO DOS IDs DO CAMPEÃO E VICE BASEADO NA CONSTANTE MANUAL NO TOPO DO ARQUIVO
     if (FINAL_MANUAL.CAMPEAO) {
       const tCamp = timesCopa.find(t => t.nome.toLowerCase() === FINAL_MANUAL.CAMPEAO?.toLowerCase())
       if (tCamp) realCampeaoId = Number(tCamp.id)
@@ -186,7 +194,6 @@ export async function POST(req: NextRequest) {
     for (const bolao of boloes) {
       const palpitesDoBolao = palpitesMata.filter(p => p.bolao_id === bolao.id)
 
-      // A. Processa as Fases de Listas (r32, r16, qf, sf)
       configuracaoFases.forEach(fase => {
         const palpitesDaFase = palpitesDoBolao.filter(p => p.fase === fase.key)
         
@@ -215,7 +222,6 @@ export async function POST(req: NextRequest) {
         })
       })
 
-      // B. Processa as Fases Finais Absolutas (Campeão e Vice)
       const palpiteCampeao = palpitesDoBolao.find(p => p.fase === 'campeao')
       const palpiteVice = palpitesDoBolao.find(p => p.fase === 'vice')
 
@@ -241,15 +247,81 @@ export async function POST(req: NextRequest) {
     }
 
     // ========================================================================
-    // ETAPA 5: PERSISTÊNCIA COMPLETA EM LOTE
+    // ETAPA 5: PRÊMIOS INDIVIDUAIS (MANTENDO OS IDs)
     // ========================================================================
-    const promessasUpsert = []
-    if (updatesJogos.length > 0) promessasUpsert.push(supabaseAdmin.from('palpites_jogos').upsert(updatesJogos, { onConflict: 'id' }))
-    if (updatesGrupos.length > 0) promessasUpsert.push(supabaseAdmin.from('palpites_grupos').upsert(updatesGrupos, { onConflict: 'id' }))
-    if (updatesMata.length > 0) promessasUpsert.push(supabaseAdmin.from('palpites_matamata').upsert(updatesMata, { onConflict: 'id' }))
+    const updatesPremios: any[] = []
 
+    for (const palpite of palpitesPremios) {
+      let pontosGanhos = 0
+
+      // Mantemos a verificação rigorosa por ID Numérico
+      if (palpite.premio === 'bolaDeOuro' && PREMIOS_MANUAIS.bolaDeOuro !== null) {
+        if (Number(palpite.jogador_id) === PREMIOS_MANUAIS.bolaDeOuro) pontosGanhos = REGRAS.PREMIO_BOLA_OURO
+      } 
+      else if (palpite.premio === 'chuteiraDeOuro' && PREMIOS_MANUAIS.chuteiraDeOuro !== null) {
+        if (Number(palpite.jogador_id) === PREMIOS_MANUAIS.chuteiraDeOuro) pontosGanhos = REGRAS.PREMIO_CHUTEIRA_OURO
+      } 
+      else if (palpite.premio === 'luvaDeOuro' && PREMIOS_MANUAIS.luvaDeOuro !== null) {
+        if (Number(palpite.jogador_id) === PREMIOS_MANUAIS.luvaDeOuro) pontosGanhos = REGRAS.PREMIO_LUVA_OURO
+      }
+
+      // Adiciona a pontuação no ranking geral do bolão
+      if (palpite.bolao_id && rankingBoloes[palpite.bolao_id] !== undefined) {
+        rankingBoloes[palpite.bolao_id] += pontosGanhos
+      }
+
+      // Monta o objeto para o Supabase usando o nome correto da coluna (bolao_id)
+      updatesPremios.push({
+        id: palpite.id, 
+        bolao_id: palpite.bolao_id, 
+        premio: palpite.premio,
+        time_id: palpite.time_id,
+        jogador_id: palpite.jogador_id, 
+        pontos: pontosGanhos
+      })
+    } 
+
+    // ========================================================================
+    // ETAPA 6: PERSISTÊNCIA COMPLETA EM LOTE (Evitando sobrecarga de rede)
+    // ========================================================================
+    const promessasUpsert: Promise<any>[] = []
+
+    const upsertSeguro = async (tabela: string, dados: any[]) => {
+      const { error } = await supabaseAdmin.from(tabela).upsert(dados, { onConflict: 'id' })
+      if (error) {
+        console.error(`Erro CRÍTICO no upsert da tabela ${tabela}:`, error)
+        throw new Error(`Falha no upsert da tabela ${tabela}: ${error.message}`)
+      }
+    }
+
+    if (updatesJogos.length > 0) promessasUpsert.push(upsertSeguro('palpites_jogos', updatesJogos))
+    if (updatesGrupos.length > 0) promessasUpsert.push(upsertSeguro('palpites_grupos', updatesGrupos))
+    if (updatesMata.length > 0) promessasUpsert.push(upsertSeguro('palpites_matamata', updatesMata))
+
+    // 1. Aguarda as tabelas pesadas fazerem o upsert de lote único
     await Promise.all(promessasUpsert)
 
+    // 2. SOLUÇÃO: Atualiza os Prêmios em lotes menores para não causar "fetch failed"
+    if (updatesPremios.length > 0) {
+      const tamanhoLote = 50; // Limite seguro de requisições simultâneas
+      
+      for (let i = 0; i < updatesPremios.length; i += tamanhoLote) {
+        const lote = updatesPremios.slice(i, i + tamanhoLote);
+        
+        await Promise.all(
+          lote.map(premio => 
+            supabaseAdmin.from('palpites_premios')
+              .update({ pontos: premio.pontos })
+              .eq('id', premio.id)
+              .then(({ error }) => {
+                if (error) throw new Error(`Falha no update do prêmio ${premio.id}: ${error.message}`)
+              })
+          )
+        );
+      }
+    }
+
+    // 3. Atualiza a pontuação total dos bolões
     for (const bolao of boloes) {
       const pontosFinais = rankingBoloes[bolao.id] || 0
       const { error: erroUpdateBolao } = await supabaseAdmin
@@ -262,8 +334,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Cálculo e pontuação de todas as etapas do funil do bolão processados com sucesso!' 
-    })
+      message: 'Cálculo e pontuação de todas as etapas (incluindo prêmios) processados com sucesso!' 
+    }) 
 
   } catch (err: any) {
     console.error("Erro no processamento de pontos:", err)
