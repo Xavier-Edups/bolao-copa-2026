@@ -60,9 +60,9 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
     vice: string;
   }>>({})
   const [palpitesPremios, setPalpitesPremios] = useState<Record<string, {
-    bolaDeOuro: { timeId: string, jogador: string };
-    chuteiraDeOuro: { timeId: string, jogador: string };
-    luvaDeOuro: { timeId: string, jogador: string };
+    bolaDeOuro: { timeId: string, jogador: string, pontos: number };
+    chuteiraDeOuro: { timeId: string, jogador: string, pontos: number };
+    luvaDeOuro: { timeId: string, jogador: string, pontos: number };
   }>>({})
 
   useEffect(() => {
@@ -193,17 +193,21 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
         resPremios.data?.forEach(p => {
           if (!recPremios[p.bolao_id]) {
             recPremios[p.bolao_id] = {
-              bolaDeOuro: { timeId: '', jogador: '' },
-              chuteiraDeOuro: { timeId: '', jogador: '' },
-              luvaDeOuro: { timeId: '', jogador: '' }
+              bolaDeOuro: { timeId: '', jogador: '', pontos: 0 },
+              chuteiraDeOuro: { timeId: '', jogador: '', pontos: 0 },
+              luvaDeOuro: { timeId: '', jogador: '', pontos: 0 }
             }
           }
           const jogador = jogadores.find(j => j.id === p.jogador_id)
           if (jogador) {
-            recPremios[p.bolao_id][p.premio] = { timeId: p.time_id.toString(), jogador: jogador.nome }
+            recPremios[p.bolao_id][p.premio] = { 
+              timeId: p.time_id.toString(), 
+              jogador: jogador.nome,
+              pontos: Number(p.pontos) || 0 // <-- ISSO AQUI RESOLVE O PROBLEMA
+            }
           }
         })
-        setPalpitesPremios(recPremios)
+        setPalpitesPremios(recPremios) 
 
       } catch (error) {
         console.error("Erro ao carregar dados salvos da nuvem:", error)
@@ -217,7 +221,7 @@ export default function setMeusBoloesPainel({ partidas1f, partidas2f, times, jog
   
    const handleSalvarBolao = async () => {
     if (!bolaoAtivo) return
-    setIsSaving(true)
+    //setIsSaving(true)
 
     try {
       const bolaoId = bolaoAtivo.id
@@ -1516,34 +1520,57 @@ const handleAbrirBolao = (bolao: Bolao) => {
               })()} 
 
               {/* ======================================= */}
-              {/* ABA PRÊMIOS (BLOQUEIA APÓS O PRAZO) */}
+              {/* ABA PRÊMIOS (COM HIGHLIGHT E PONTOS) */}
               {/* ======================================= */}
               {abaAtiva === 'premios_individuais' && (() => {
                 
+                // Adicionado a chave "pontos: 0" ao fallback inicial
                 const state = palpitesPremios[bolaoAtivo.id] || {
-                  bolaDeOuro: { timeId: '', jogador: '' },
-                  chuteiraDeOuro: { timeId: '', jogador: '' },
-                  luvaDeOuro: { timeId: '', jogador: '' }
+                  bolaDeOuro: { timeId: '', jogador: '', pontos: 0 },
+                  chuteiraDeOuro: { timeId: '', jogador: '', pontos: 0 },
+                  luvaDeOuro: { timeId: '', jogador: '', pontos: 0 }
                 }
 
+                // Adicionado "highlight" e "tagAcerto" aos temas
                 const premios = [
                   {
                     key: 'bolaDeOuro',
                     label: 'Bola de Ouro (Melhor Jogador)',
                     icon: '🏆',
-                    theme: { bg: 'from-amber-900/20', border: 'border-amber-500/30', text: 'text-amber-400', focus: 'focus:border-amber-400 focus:ring-1 focus:ring-amber-400' }
+                    theme: { 
+                      bg: 'from-amber-900/20', 
+                      border: 'border-amber-500/30', 
+                      text: 'text-amber-400', 
+                      focus: 'focus:border-amber-400 focus:ring-1 focus:ring-amber-400',
+                      highlight: 'border-amber-400 bg-amber-900/10 shadow-[0_0_15px_rgba(245,158,11,0.25)]',
+                      tagAcerto: 'bg-amber-400/20 text-amber-400 border-amber-400/50 shadow-[0_0_8px_rgba(245,158,11,0.4)]'
+                    }
                   },
                   {
                     key: 'chuteiraDeOuro',
                     label: 'Chuteira de Ouro (Artilheiro)',
                     icon: '⚽',
-                    theme: { bg: 'from-teal-900/20', border: 'border-teal-500/30', text: 'text-teal-400', focus: 'focus:border-teal-400 focus:ring-1 focus:ring-teal-400' }
+                    theme: { 
+                      bg: 'from-teal-900/20', 
+                      border: 'border-teal-500/30', 
+                      text: 'text-teal-400', 
+                      focus: 'focus:border-teal-400 focus:ring-1 focus:ring-teal-400',
+                      highlight: 'border-teal-400 bg-teal-900/10 shadow-[0_0_15px_rgba(45,212,191,0.25)]',
+                      tagAcerto: 'bg-teal-400/20 text-teal-400 border-teal-400/50 shadow-[0_0_8px_rgba(45,212,191,0.4)]'
+                    }
                   },
                   {
                     key: 'luvaDeOuro',
                     label: 'Luva de Ouro (Melhor Goleiro)',
                     icon: '🧤',
-                    theme: { bg: 'from-emerald-900/20', border: 'border-emerald-500/30', text: 'text-emerald-400', focus: 'focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400' }
+                    theme: { 
+                      bg: 'from-emerald-900/20', 
+                      border: 'border-emerald-500/30', 
+                      text: 'text-emerald-400', 
+                      focus: 'focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400',
+                      highlight: 'border-emerald-400 bg-emerald-900/10 shadow-[0_0_15px_rgba(52,211,153,0.25)]',
+                      tagAcerto: 'bg-emerald-400/20 text-emerald-400 border-emerald-400/50 shadow-[0_0_8px_rgba(52,211,153,0.4)]'
+                    }
                   },
                 ] as const;
 
@@ -1554,94 +1581,111 @@ const handleAbrirBolao = (bolao: Bolao) => {
                       <p className="text-xs text-gray-400">Escolha a seleção e digite o nome do jogador que vai faturar a premiação.</p>
                     </div>
 
-                    <div className="flex flex-col gap-6">
-                      {premios.map(premio => {
-                        const valorAtual = state[premio.key];
-                        const timeSelecionado = times.find(t => t.id.toString() === valorAtual.timeId);
+            <div className="flex flex-col gap-6">
+              {premios.map(premio => {
+                // Pegamos o estado atual com segurança (evitando crashes se for undefined)
+                const valorAtual = state[premio.key] || { timeId: '', jogador: '', pontos: 0 };
+                const timeSelecionado = times.find(t => t.id.toString() === valorAtual.timeId);
+                
+                // LÓGICA DE PONTOS CORRIGIDA (usando o valorAtual.pontos)
+                const pontosGanhos = valorAtual.pontos || 0;
+                const acertou = pontosGanhos > 0;
 
-                        return (
-                          <div key={premio.key} className={`bg-gradient-to-br ${premio.theme.bg} to-black/40 border ${premio.theme.border} p-5 rounded-2xl shadow-xl transition-all`}>
-                            <h5 className={`${premio.theme.text} font-black tracking-widest text-sm mb-4 uppercase flex items-center gap-2`}>
-                              <span className="text-xl drop-shadow-md">{premio.icon}</span> {premio.label}
-                            </h5>
+                return (
+                  // APLICANDO O HIGHLIGHT CONDICIONAL NA BORDA E SOMBRA
+                  <div key={premio.key} className={`bg-gradient-to-br ${premio.theme.bg} to-black/40 border ${acertou ? premio.theme.highlight : premio.theme.border} p-5 rounded-2xl transition-all relative`}>
+                    
+                    {/* LINHA DO TÍTULO COM A TAG DE PONTOS */}
+                    <div className="flex items-start sm:items-center justify-between mb-4 gap-2">
+                      <h5 className={`${premio.theme.text} font-black tracking-widest text-sm uppercase flex items-center gap-2`}>
+                        <span className="text-xl drop-shadow-md">{premio.icon}</span> {premio.label}
+                      </h5>
+                      
+                      {/* SÓ MOSTRA OS PONTOS SE AS INSCRIÇÕES ESTIVEREM ENCERRADAS (Pós-Bloqueio) */}
+                      {isInscricoesEncerradas && (
+                        <div className={`shrink-0 px-2.5 py-1 rounded border font-black text-[10px] sm:text-xs transition-colors ${acertou ? premio.theme.tagAcerto : 'bg-black/60 border-white/10 text-gray-500'}`}>
+                          {acertou ? `${pontosGanhos}` : '0'} <span className="text-[8px] font-normal opacity-70">pts</span>
+                        </div>
+                      )}
+                    </div>
 
-                            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                              
-                              <div className="relative flex items-center w-full sm:w-2/5">
-                                {timeSelecionado && (
-                                  <img 
-                                    src={timeSelecionado.bandeira || '/placeholder-flag.png'} 
-                                    alt={timeSelecionado.nome} 
-                                    className="absolute left-3 w-6 h-6 rounded-full object-cover shadow-sm pointer-events-none z-10" 
-                                  />
-                                )}
-                                
-                                {/* BLOQUEIO CONDICIONAL: PREMIOS (TIME) */}
-                                {isInscricoesEncerradas ? (
-                                  <div className={`w-full bg-black/40 border border-white/5 rounded-xl text-white font-bold text-xs py-3.5 pr-3 truncate ${timeSelecionado ? 'pl-11 text-left' : 'pl-4 text-left text-gray-600'}`}>
-                                    {timeSelecionado ? timeSelecionado.nome : '—'}
-                                  </div>
-                                ) : (
-                                  <select
-                                    value={valorAtual.timeId}
-                                    onChange={(e) => {
-                                      handlePremioChange(premio.key, 'timeId', e.target.value)
-                                      handlePremioChange(premio.key, 'jogador', '')
-                                    }}
-                                    className={`w-full bg-black/60 border border-white/10 rounded-xl text-white font-bold text-xs py-3.5 pr-3 ${premio.theme.focus} outline-none appearance-none cursor-pointer truncate transition-all ${timeSelecionado ? 'pl-11 text-left' : 'pl-4 text-left'}`}
-                                  >
-                                    <option value="" className="text-gray-500">- Escolher Seleção -</option>
-                                    {[...times].sort((a, b) => a.nome.localeCompare(b.nome)).map(time => (
-                                      <option key={time.id} value={time.id} className="text-white bg-gray-900">{time.nome}</option>
-                                    ))}
-                                  </select>
-                                )}
-                              </div>
-
-                              <div className="w-full sm:w-3/5">
-                                {/* BLOQUEIO CONDICIONAL: PREMIOS (JOGADOR) */}
-                                {isInscricoesEncerradas ? (
-                                  <div className="w-full bg-black/40 border border-white/5 rounded-xl text-white font-bold text-sm p-3.5 truncate">
-                                    {valorAtual.jogador ? valorAtual.jogador : <span className="text-gray-600">—</span>}
-                                  </div>
-                                ) : (
-                                  <select
-                                    value={valorAtual.jogador}
-                                    onChange={(e) => handlePremioChange(premio.key, 'jogador', e.target.value)}
-                                    disabled={!valorAtual.timeId}
-                                    className={`w-full bg-black/60 border border-white/10 rounded-xl text-white font-bold text-sm p-3.5 focus:outline-none ${premio.theme.focus} transition-all appearance-none cursor-pointer ${!valorAtual.timeId ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                  >
-                                    <option value="" className="text-gray-500">
-                                      {!valorAtual.timeId ? '← Escolha a seleção primeiro' : '- Escolha o jogador -'}
-                                    </option>
-                                    
-                                    {jogadores
-                                      .filter(j => {
-                                        const mesmoTime = j.time_id.toString() === valorAtual.timeId
-                                        const isGoleiro = premio.key === 'luvaDeOuro' 
-                                          ? j.posicao && j.posicao.toLowerCase().includes('goalkeeper') 
-                                          : true
-                                        
-                                        return mesmoTime && isGoleiro
-                                      })
-                                      .map(jogador => (
-                                        <option key={jogador.id} value={jogador.nome} className="bg-gray-900 text-white">
-                                          {jogador.nome}
-                                        </option>
-                                      ))
-                                    }
-                                  </select>
-                                )}
-                              </div>
-                              
-                            </div>
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                      
+                      {/* BLOCO DA SELEÇÃO */}
+                      <div className="relative flex items-center w-full sm:w-2/5">
+                        {timeSelecionado && (
+                          <img 
+                            src={timeSelecionado.bandeira || '/placeholder-flag.png'} 
+                            alt={timeSelecionado.nome} 
+                            className="absolute left-3 w-6 h-6 rounded-full object-cover shadow-sm pointer-events-none z-10" 
+                          />
+                        )}
+                        
+                        {/* BLOQUEIO CONDICIONAL: PREMIOS (TIME) */}
+                        {isInscricoesEncerradas ? (
+                          <div className={`w-full bg-black/40 border border-white/5 rounded-xl text-white font-bold text-xs py-3.5 pr-3 truncate ${timeSelecionado ? 'pl-11 text-left' : 'pl-4 text-left text-gray-600'}`}>
+                            {timeSelecionado ? timeSelecionado.nome : '—'}
                           </div>
-                        )
-                      })}
+                        ) : (
+                          <select
+                            value={valorAtual.timeId}
+                            onChange={(e) => {
+                              handlePremioChange(premio.key, 'timeId', e.target.value)
+                              handlePremioChange(premio.key, 'jogador', '')
+                            }}
+                            className={`w-full bg-black/60 border border-white/10 rounded-xl text-white font-bold text-xs py-3.5 pr-3 ${premio.theme.focus} outline-none appearance-none cursor-pointer truncate transition-all ${timeSelecionado ? 'pl-11 text-left' : 'pl-4 text-left'}`}
+                          >
+                            <option value="" className="text-gray-500">- Escolher Seleção -</option>
+                            {[...times].sort((a, b) => a.nome.localeCompare(b.nome)).map(time => (
+                              <option key={time.id} value={time.id} className="text-white bg-gray-900">{time.nome}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      {/* BLOCO DO JOGADOR */}
+                      <div className="w-full sm:w-3/5">
+                        {/* BLOQUEIO CONDICIONAL: PREMIOS (JOGADOR) */}
+                        {isInscricoesEncerradas ? (
+                          <div className="w-full bg-black/40 border border-white/5 rounded-xl text-white font-bold text-sm p-3.5 truncate">
+                            {valorAtual.jogador ? valorAtual.jogador : <span className="text-gray-600">—</span>}
+                          </div>
+                        ) : (
+                          <select
+                            value={valorAtual.jogador}
+                            onChange={(e) => handlePremioChange(premio.key, 'jogador', e.target.value)}
+                            disabled={!valorAtual.timeId}
+                            className={`w-full bg-black/60 border border-white/10 rounded-xl text-white font-bold text-sm p-3.5 focus:outline-none ${premio.theme.focus} transition-all appearance-none cursor-pointer ${!valorAtual.timeId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            <option value="" className="text-gray-500">
+                              {!valorAtual.timeId ? '← Escolha a seleção primeiro' : '- Escolha o jogador -'}
+                            </option>
+                            
+                            {jogadores
+                              .filter(j => {
+                                const mesmoTime = j.time_id.toString() === valorAtual.timeId
+                                const isGoleiro = premio.key === 'luvaDeOuro' 
+                                  ? j.posicao && j.posicao.toLowerCase().includes('goalkeeper') 
+                                  : true
+                                
+                                return mesmoTime && isGoleiro
+                              })
+                              .map(jogador => (
+                                <option key={jogador.id} value={jogador.nome} className="bg-gray-900 text-white">
+                                  {jogador.nome}
+                                </option>
+                              ))
+                            }
+                          </select>
+                        )}
+                      </div>
+                      
                     </div>
                   </div>
-                )
-              })()}
+                )})}
+                </div>
+              </div>
+              )})()}
             </div>
 
             <div className="border-t border-white/5 bg-black/60 backdrop-blur-md px-2 py-3 overflow-x-auto flex gap-1 scrollbar-none justify-start sm:justify-center">
